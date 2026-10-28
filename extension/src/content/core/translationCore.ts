@@ -304,7 +304,7 @@ export class TranslationCore {
 
       // Some providers (or the background worker) may still answer after the
       // caller cancelled. Never let that obsolete reply overwrite the cache.
-      if (!translatedData || signal?.aborted) {
+      if (!translatedData?.translatedText?.trim() || signal?.aborted) {
         return null;
       }
 

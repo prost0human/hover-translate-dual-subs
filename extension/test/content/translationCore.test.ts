@@ -413,6 +413,16 @@ describe("what the translator returns or throws", () => {
     expect(core.hasCachedTranslation("run")).toBe(false);
   });
 
+  it("does not cache an empty provider response, so a later request can recover", async () => {
+    const translator = new RecordingTranslator();
+    const translate = vi.spyOn(translator, "translate").mockResolvedValueOnce({ detectedLanguageCode: "en", translatedText: "  " });
+    const core = await createCore(translator);
+    expect(await core.translateText("run")).toBeNull();
+    expect(core.hasCachedTranslation("run")).toBe(false);
+    expect((await core.translateText("run"))?.translatedText).toBe("«run»");
+    expect(translate).toHaveBeenCalledTimes(2);
+  });
+
   it("an aborted request is not an error", async () => {
     const abort = Object.assign(new Error("aborted"), { name: "AbortError" });
     const core = await createCore(new RecordingTranslator(false, abort));
