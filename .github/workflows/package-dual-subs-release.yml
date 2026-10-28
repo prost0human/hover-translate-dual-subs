@@ -1,0 +1,57 @@
+# One-time packaging of the user-requested Chromium release. The archive is
+# built on GitHub because the sandbox cannot reach uploads.github.com.
+name: Package Dual Subs release
+
+on:
+  push:
+    branches: ["arena/86f5f9ef-hover-translate-dual-subs"]
+    paths: [".github/workflows/package-dual-subs-release.yml"]
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    env:
+      HUSKY: 0
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            extension/package-lock.json
+            popup/package-lock.json
+      - name: Install locked dependencies
+        run: |
+          npm ci
+          npm ci --prefix extension
+          npm ci --prefix popup
+      - name: Build Chromium archive
+        run: npm run release:chrome
+      - name: Check the archive
+        run: |
+          archive=releases/1.3.0/hover-translate-chrome-production.zip
+          unzip -tq "$archive"
+          python3 - <<'PY'
+          import json, zipfile
+          archive = 'releases/1.3.0/hover-translate-chrome-production.zip'
+          with zipfile.ZipFile(archive) as z:
+              names = set(z.namelist())
+              manifest = json.loads(z.read('manifest.json'))
+              required = ['manifest.json', 'extension/dist/content.bundle.js',
+                          'extension/dist/background.bundle.js', 'extension/dist/styles.css',
+                          'popup/dist/index.html', '_locales/en/messages.json',
+                          '_locales/ru/messages.json', 'LICENSE', 'THIRD_PARTY_LICENSES.txt']
+              assert all(path in names for path in required)
+              assert manifest['manifest_version'] == 3 and 'key' not in manifest
+              assert all(not name.startswith('/') and '..' not in name.split('/') for name in names)
+          PY
+          sha256sum "$archive"
+      - name: Attach archive to the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload dual-subs-v1.3.0 releases/1.3.0/hover-translate-chrome-production.zip
