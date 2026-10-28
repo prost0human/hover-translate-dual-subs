@@ -43,6 +43,7 @@ const MAX_DISMISSALS = 3;
 const MIN_DAYS_AFTER_DISMISSAL = 30;
 
 const CHROME_WEB_STORE_ID = "jbddomeagbjjdoaehkdffdhifdhnmfic";
+const ORIGINAL_FIREFOX_ID = "{C49CC196-68CC-441D-9224-2A05F1A073BF}";
 const EDGE_ADD_ONS_ID = "emnbmkhbohfjmbkdipkppnbdlhgnhmhm";
 
 /**
@@ -56,7 +57,7 @@ const EDGE_ADD_ONS_ID = "emnbmkhbohfjmbkdipkppnbdlhgnhmhm";
  * own; Edge Add-ons has no separate reviews page either.
  */
 export function getReviewPageUrl(extensionUrl: string, extensionId: string): string | null {
-  if (extensionUrl.startsWith("moz-extension://")) return "https://addons.mozilla.org/firefox/addon/hovertranslate/";
+  if (extensionUrl.startsWith("moz-extension://") && extensionId === ORIGINAL_FIREFOX_ID) return "https://addons.mozilla.org/firefox/addon/hovertranslate/";
   if (extensionId === CHROME_WEB_STORE_ID) return `https://chromewebstore.google.com/detail/${CHROME_WEB_STORE_ID}/reviews`;
   if (extensionId === EDGE_ADD_ONS_ID) return `https://microsoftedge.microsoft.com/addons/detail/${EDGE_ADD_ONS_ID}`;
   return null;

@@ -1,3 +1,5 @@
+> **Fork notice:** The supported target of this fork is Chromium. For the current Chrome/Edge/Brave build, installation, migration and test steps see [README](README.md) / [README.ru.md](README.ru.md). The Firefox steps below are inherited build notes; Firefox has a separate fork ID and is not verified or ready for publication. Do not submit the original store listing/site as the fork.
+
 # Build Instructions for HoverTranslate Firefox Extension
 
 This document provides step-by-step instructions to build the HoverTranslate extension from source code for Firefox Add-ons review.
@@ -10,7 +12,7 @@ This document provides step-by-step instructions to build the HoverTranslate ext
 
 `.npmrc` sets `engine-strict`, so `npm ci` stops with an error on an older Node.js or npm.
 
-The submitted package was built on Linux x86_64 with Node.js 24.12.0 and npm 11.6.2. The same steps with Node.js 24.14.0 and npm 11.9.0 produce byte-identical `extension/dist/` and `popup/dist/`.
+The upstream project documented builds with Node.js 24.12.0 and npm 11.6.2. Reproducibility of this modified fork against an upstream store package has not been established.
 
 ## Project Structure
 
@@ -125,11 +127,11 @@ Vite splits the popup into chunks: each page is loaded lazily and gets its own, 
 
 ## Verification Steps
 
-To verify the build matches the submitted extension:
+To inspect a local build:
 
 1. Follow the installation and build steps above
-2. Compare the generated files in `extension/dist/` and `popup/dist/`
-3. File sizes and functionality should match the submitted extension exactly
+2. Inspect the generated files in `extension/dist/` and `popup/dist/`
+3. Run the checks and manual verification in the fork README; no submitted package is claimed.
 
 ## Dependencies
 

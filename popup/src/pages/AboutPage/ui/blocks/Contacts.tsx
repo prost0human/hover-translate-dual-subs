@@ -5,7 +5,6 @@ import List from "@mui/material/List";
 import ListItemButton from "@mui/material/ListItemButton";
 import ListItemIcon from "@mui/material/ListItemIcon";
 import ListItemText from "@mui/material/ListItemText";
-import EmailIcon from "@mui/icons-material/Email";
 import GitHubIcon from "@mui/icons-material/GitHub";
 import BugReportIcon from "@mui/icons-material/BugReport";
 import { useTranslation } from "react-i18next";
@@ -15,13 +14,13 @@ export const Contacts: FC = () => {
 
   const openGithubProjectPage = () => {
     chrome.tabs.create({
-      url: "https://github.com/kozii-d/hover-translate",
+      url: "https://github.com/prost0human/hover-translate-dual-subs",
     });
   };
 
   const openGithubIssuesPage = () => {
     chrome.tabs.create({
-      url: "https://github.com/kozii-d/hover-translate/issues",
+      url: "https://github.com/prost0human/hover-translate-dual-subs/issues",
     });
   };
 
@@ -31,21 +30,16 @@ export const Contacts: FC = () => {
         {t("blocks.contacts.title")}
       </Typography>
       <List>
-        <ListItemButton
-          component="a"
-          href="mailto:hovertranslate@gmail.com"
-        >
-          <ListItemIcon>
-            <EmailIcon />
-          </ListItemIcon>
-          <ListItemText primary="hovertranslate@gmail.com" />
-        </ListItemButton>
-
         <ListItemButton onClick={openGithubProjectPage}>
           <ListItemIcon>
             <GitHubIcon />
           </ListItemIcon>
           <ListItemText primary={t("blocks.contacts.github")} />
+        </ListItemButton>
+
+        <ListItemButton component="a" href="https://github.com/kozii-d/hover-translate" target="_blank" rel="noopener noreferrer">
+          <ListItemIcon><GitHubIcon /></ListItemIcon>
+          <ListItemText primary={t("blocks.contacts.upstream")} />
         </ListItemButton>
 
         <ListItemButton onClick={openGithubIssuesPage}>

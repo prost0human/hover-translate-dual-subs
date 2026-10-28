@@ -16,12 +16,16 @@ const MIN_VISIBLE_TEXT_ALPHA = 0.25;
  * of U+200B, and draw some lines twice, the copy on top transparent.
  */
 export function findVisibleCaptionSegment(root: ParentNode): HTMLElement | null {
-  return Array.from(root.querySelectorAll<HTMLElement>(`.${CAPTION_SEGMENT}`)).find((segment) => {
-    if (!/[^\s\p{Cf}]/u.test(segment.textContent ?? "")) return false;
-    // A colour `color-rgba` cannot parse counts as visible.
-    const [, , , alpha = 1] = rgba(window.getComputedStyle(segment).color);
-    return alpha >= MIN_VISIBLE_TEXT_ALPHA;
-  }) ?? null;
+  return Array.from(root.querySelectorAll<HTMLElement>(`.${CAPTION_SEGMENT}`)).find(isVisibleCaptionSegment) ?? null;
+}
+
+/** Whether a segment contains text that is actually visible. */
+export function isVisibleCaptionSegment(segment: HTMLElement): boolean {
+  if (!/[^\s\p{Cf}]/u.test(segment.textContent ?? "")) return false;
+  const style = window.getComputedStyle(segment);
+  if (style.display === "none" || style.visibility === "hidden") return false;
+  const [, , , alpha = 1] = rgba(style.color);
+  return alpha >= MIN_VISIBLE_TEXT_ALPHA;
 }
 
 /**

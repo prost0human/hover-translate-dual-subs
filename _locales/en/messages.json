@@ -1,4 +1,7 @@
 {
+  "forkName": {
+    "message": "HoverTranslate Dual Subs (fork)"
+  },
   "name": {
     "message": "HoverTranslate - YouTube Subtitle Translator"
   },
@@ -120,5 +123,8 @@
   },
   "ratingPromptNotNow": {
     "message": "Not now"
+  },
+  "dualSubtitleError": {
+    "message": "Subtitle translation unavailable"
   }
 }

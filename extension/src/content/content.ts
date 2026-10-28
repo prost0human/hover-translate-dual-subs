@@ -14,6 +14,8 @@ import { sendMessageToBackground } from "../common/services/messagingService.ts"
 import { Settings } from "../common/types/settings.ts";
 import { state } from "./state/stateManager.ts";
 import { trackShiftKey } from "./utils/shiftKey.ts";
+import { DualSubtitleService } from "./services/dualSubtitleService.ts";
+import { DUAL_SETTINGS_KEY, DualSubtitleSettings } from "../common/types/dualSubtitles.ts";
 
 let activeObserverService: MutationObserverService | null = null;
 let activeTranslationCore: TranslationCore | null = null;
@@ -59,7 +61,7 @@ const main = async () => {
   const generation = ++initGeneration;
 
   try {
-    const settings = await chrome.storage.sync.get<{ settings?: Settings }>("settings");
+    const settings = await chrome.storage.sync.get<{ settings?: Settings; dualSubtitleSettings?: Partial<DualSubtitleSettings> }>(["settings", DUAL_SETTINGS_KEY]);
 
     const translatorKey = settings?.settings?.translator || "google";
 
@@ -89,7 +91,8 @@ const main = async () => {
     const translationCore = new TranslationCore(translator);
     const videoController = new VideoController();
     const ratingPromptService = new RatingPromptService(videoController);
-    const tooltipService = new TooltipService(translationCore, ratingPromptService);
+    const dualSubtitleService = new DualSubtitleService(translationCore, settings.dualSubtitleSettings);
+    const tooltipService = new TooltipService(translationCore, ratingPromptService, dualSubtitleService);
     const subtitleCore = new SubtitleCore(tooltipService);
 
     if (bingWithoutAccess) {
@@ -105,7 +108,7 @@ const main = async () => {
     activeObserverService?.destroy();
     activeTranslationCore?.destroy();
 
-    activeObserverService = new MutationObserverService(subtitleCore, videoController, tooltipService, ratingPromptService);
+    activeObserverService = new MutationObserverService(subtitleCore, videoController, tooltipService, ratingPromptService, dualSubtitleService);
     activeTranslationCore = translationCore;
     activeTranslatorKey = translatorKey;
   } catch (error) {

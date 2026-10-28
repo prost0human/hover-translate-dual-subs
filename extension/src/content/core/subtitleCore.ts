@@ -261,7 +261,7 @@ export class SubtitleCore {
     document.querySelectorAll(`.${CAPTION_WINDOW}`).forEach((captionWindow) => {
       const width = Math.max(0, ...Array.from(captionWindow.querySelectorAll(`.${CAPTION_SEGMENT}`))
         .map((segment) => segment.getBoundingClientRect().width));
-      if (captionWindow instanceof HTMLElement && width > 0) {
+      if (captionWindow instanceof HTMLElement && width > 0 && captionWindow.style.width !== `${width}px`) {
         captionWindow.style.width = `${width}px`;
       }
     });

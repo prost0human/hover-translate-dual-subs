@@ -43,7 +43,7 @@
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "devDependencies": {
     "@playwright/test": "1.63.0",
     "concurrently": "10.0.5",

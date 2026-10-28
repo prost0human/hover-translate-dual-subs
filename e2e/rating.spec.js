@@ -1,4 +1,7 @@
 const { test, expect } = require("./extension.js");
+// The fork intentionally has no upstream store key. These original-store card
+// tests only apply to an upstream build with that identity.
+test.skip(!require("../manifest.chrome.json").key, "Fork has no upstream Chrome Web Store identity");
 
 // The request for a rating on the video: with the save that brings the word
 // list to ten, a week after the install. Shown, it counts as put off, as the

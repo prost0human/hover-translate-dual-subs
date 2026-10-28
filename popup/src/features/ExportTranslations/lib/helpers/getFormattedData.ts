@@ -9,6 +9,10 @@ const getDataToExport = async (): Promise<TranslationToExport[]> => {
     return [];
   }
 
+  // Preserve the original export shape for legacy-only dictionaries; if any
+  // record has context, include those columns for every row.
+  const includeContext = savedTranslations.some((entry) =>
+    [entry.exampleOriginal, entry.exampleTranslation, entry.videoTitle, entry.videoUrl, entry.videoTimeSeconds, entry.note].some((value) => value !== undefined));
   return savedTranslations.map((translation => {
     return {
       "Date": dayjs(translation.timestamp).format("DD/MM/YYYY HH:mm:ss"),
@@ -19,6 +23,14 @@ const getDataToExport = async (): Promise<TranslationToExport[]> => {
       "Transliteration": translation.transliteration || "",
       "Transcription": translation.transcription || "",
       "Dictionary": translation.dictionary || "",
+      ...(includeContext ? {
+        "Example": translation.exampleOriginal ?? "",
+        "Example translation": translation.exampleTranslation ?? "",
+        "Video title": translation.videoTitle ?? "",
+        "Video URL": translation.videoUrl ?? "",
+        "Video time (seconds)": translation.videoTimeSeconds?.toString() ?? "",
+        "Note": translation.note ?? "",
+      } : {}),
     };
   }));
 };
@@ -35,49 +47,34 @@ export const getJSONToExport = async (): Promise<string> => {
  */
 const FORMULA_PREFIXES = ["=", "+", "-", "@", "\t", "\r"];
 
+/** RFC 4180 quoting, plus the existing spreadsheet-formula protection. */
+export const escapeCsvValue = (value: string | number | boolean | null | undefined, forceQuote = false): string => {
+  if (value === null || value === undefined) return forceQuote ? "\"\"" : "";
+  let text = value.toString();
+  if (FORMULA_PREFIXES.some((prefix) => text.startsWith(prefix))) text = `'${text}`;
+  return forceQuote || /[,"\n\r]/.test(text) ? `"${text.replace(/"/g, "\"\"")}"` : text;
+};
+
 export const getCSVToExport = async (): Promise<string> => {
   const data = await getDataToExport();
-
-  if (data.length === 0) {
-    return "";
-  }
-
+  if (!data.length) return "";
   const headers = Object.keys(data[0]) as Array<keyof TranslationToExport>;
+  const rows = data.map((item) => headers.map((header) => escapeCsvValue(item[header])).join(","));
+  return `\uFEFF${[headers.join(","), ...rows].join("\n")}`;
+};
 
-  const escapeValue = (value: string | number | boolean | null | undefined): string => {
-    if (value === null || value === undefined) {
-      return "";
-    }
-
-    let stringValue = value.toString();
-
-    // Excel, LibreOffice and Google Sheets run a cell that starts with one of
-    // these as a formula. Everything exported here — the original, the
-    // translation, the dictionary entry — is subtitle text from an arbitrary
-    // YouTube video, so without this the video's author decides what the
-    // viewer's spreadsheet executes when they open their own dictionary.
-    // A leading apostrophe is what spreadsheets read as "the rest is text".
-    if (FORMULA_PREFIXES.some((prefix) => stringValue.startsWith(prefix))) {
-      stringValue = `'${stringValue}`;
-    }
-
-    // `\r` belongs here too: a lone carriage return inside an unquoted value
-    // ends the row for most readers.
-    if (/[,"\n\r]/.test(stringValue)) {
-      return `"${stringValue.replace(/"/g, "\"\"")}"`;
-    }
-
-    return stringValue;
-  };
-
-  const csv = [headers.join(",")]; // Заголовок
-  data.forEach((item) => {
-    const row = headers.map((header) => escapeValue(item[header]));
-    csv.push(row.join(","));
+/** Six plain-text fields, in the order most useful for mapping into Anki. */
+export const getAnkiCSVToExport = async (): Promise<string> => {
+  const entries = await getFromStorage<SavedTranslation[]>("savedTranslations", "local") ?? [];
+  const rows = entries.map((entry) => {
+    const fields = [
+      entry.originalText, entry.translatedText, entry.exampleOriginal ?? "",
+      entry.exampleTranslation ?? "", entry.videoUrl ?? "", entry.note ?? "",
+    ];
+    // A leading # must not be mistaken for an Anki comment/directive.
+    return fields.map((value, index) => escapeCsvValue(value, index === 0)).join(",");
   });
-
-  // Without the byte order mark Excel reads the file in the system's legacy
-  // code page, and every non-Latin word (Arabic, Cyrillic, Chinese) comes out
-  // garbled. LibreOffice skips it when it reads the file as UTF-8, its default.
-  return `\uFEFF${csv.join("\n")}`;
+  // Anki 2.1.54+ names columns with #columns. A plain CSV header would be
+  // imported as an unwanted note. No BOM: # must be the first byte.
+  return ["#separator:Comma", "#html:false", "#columns:English,Russian,Example,Example translation,Video URL,Note", ...rows].join("\n");
 };

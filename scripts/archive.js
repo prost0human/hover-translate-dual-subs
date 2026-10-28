@@ -1,5 +1,7 @@
 const fs = require("fs");
-const { execSync } = require("child_process");
+const { execSync, execFileSync } = require("child_process");
+const os = require("os");
+const { runtimeNotices } = require("./runtime-notices.js");
 const path = require("path");
 
 // Usage: node archive.js [browser] [mode]
@@ -66,7 +68,7 @@ function createArchive(browserName) {
 
     const excludePatterns = ["*.DS_Store", ".claude", ".claude/*", "CLAUDE.md"];
     const excludeArgs = excludePatterns.map(p => `-x "${p}"`).join(" ");
-    const filesToInclude = "manifest.json _locales assets/icons extension/dist popup/dist";
+    const filesToInclude = "manifest.json LICENSE THIRD_PARTY_NOTICES.md _locales assets/icons extension/dist popup/dist";
 
     if (fs.existsSync(outputPath)) {
       fs.unlinkSync(outputPath);
@@ -77,6 +79,17 @@ function createArchive(browserName) {
 
     console.log(`Running: ${command}`);
     execSync(command, { stdio: "inherit" });
+
+    // Preserve copyright/license notices for the actual installed runtime graph.
+    // Use a temporary file so packaging never overwrites a workspace file.
+    const noticesDir = fs.mkdtempSync(path.join(os.tmpdir(), "hover-runtime-notices-"));
+    try {
+      const noticesFile = path.join(noticesDir, "THIRD_PARTY_LICENSES.txt");
+      fs.writeFileSync(noticesFile, runtimeNotices(process.cwd()));
+      execFileSync("zip", ["-q", "-j", path.resolve(outputPath), noticesFile]);
+    } finally {
+      fs.rmSync(noticesDir, { recursive: true, force: true });
+    }
 
     console.log(`✅ Successfully packaged as ${path.relative('.', outputPath)}`);
 

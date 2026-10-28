@@ -135,15 +135,15 @@ describe("SettingsService: update", () => {
 });
 
 describe("SettingsService: the page opened after the extension is removed", () => {
-  it("every start of the worker sets it, the same address and nothing in it, whatever the start", async () => {
+  it("clears any upstream survey instead of opening it for this fork", async () => {
     const fake = installFakeChrome();
     new SettingsService();
-    expect(fake.uninstallURLs).toEqual(["https://hovertranslate.app/uninstall/"]);
+    expect(fake.uninstallURLs).toEqual([""]);
 
     // Not tied to onInstalled: an install or an update starts the worker once, and it is set once.
     for (const reason of ["install", "update"] as const) {
       const { fake } = await startBrowser(reason);
-      expect(fake.uninstallURLs).toEqual(["https://hovertranslate.app/uninstall/"]);
+      expect(fake.uninstallURLs).toEqual([""]);
     }
   });
 

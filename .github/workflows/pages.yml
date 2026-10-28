@@ -19,7 +19,10 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # The inherited site advertises the original extension and domain. Do not
+  # publish it from this independent fork without replacing that site first.
   deploy:
+    if: github.repository == 'kozii-d/hover-translate'
     runs-on: ubuntu-24.04
     permissions:
       contents: read

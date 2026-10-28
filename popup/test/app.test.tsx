@@ -151,7 +151,7 @@ it("/about: its sentences are not headings, and Changelog is a button the keyboa
   expect(document.activeElement).toBe(changelog);
   await user.keyboard("{Enter}");
 
-  expect(fake.createdTabs.map((tab) => tab.url)).toEqual(["https://github.com/kozii-d/hover-translate/blob/master/CHANGELOG.md"]);
+  expect(fake.createdTabs.map((tab) => tab.url)).toEqual(["https://github.com/prost0human/hover-translate-dual-subs/blob/master/CHANGELOG.md"]);
 });
 
 it("/about in ru: the support dialog's title is one heading, with none inside it, and its close button is named in Russian", async () => {

@@ -3,6 +3,7 @@ import { BaseTranslator } from "../../common/translators/baseTranslator.ts";
 import { ApiKeyTranslator, isApiKeyTranslator } from "../../common/translators/apiKeyTranslator.ts";
 import { serializeTranslatorError } from "../../common/translators/translatorError.ts";
 import { ApiKeyService } from "../../common/services/apiKeyService.ts";
+import { DictionaryService } from "./dictionaryService.ts";
 import { ExtensionMessage } from "../../common/types/messages.ts";
 import { getReviewPageUrl } from "../../common/ratingPrompt.ts";
 
@@ -38,6 +39,7 @@ export class MessageService {
 
   // The only writer of `apiKeys` — see `SetApiKeyMessage`.
   private readonly apiKeyService = new ApiKeyService();
+  private readonly dictionaryService = new DictionaryService();
 
   constructor() {
     this.setupMessageListeners();
@@ -95,6 +97,22 @@ export class MessageService {
 
   /** The answer to a message, or `false` when this listener does not handle it. */
   private reply(message: ExtensionMessage): Promise<unknown> | false {
+    if (message?.action === "saveDictionaryEntry") {
+      return this.dictionaryService.save(message.value);
+    }
+    if (message?.action === "importDictionaryEntries") {
+      return this.dictionaryService.import(message.value);
+    }
+    if (message?.action === "updateDictionaryEntry") {
+      return this.dictionaryService.update(message.value.id, message.value.changes).then(() => ({ success: true }));
+    }
+    if (message?.action === "removeDictionaryEntry") {
+      return this.dictionaryService.remove(message.value.id).then(() => ({ success: true }));
+    }
+    if (message?.action === "clearDictionary") {
+      return this.dictionaryService.clear().then(() => ({ success: true }));
+    }
+
     if (message?.action === "getAvailableLanguages") {
       return answerTranslatorRequest(() => this.getTranslator(message.value)
         .getAvailableLanguages()

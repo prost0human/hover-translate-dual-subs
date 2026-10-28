@@ -66,3 +66,25 @@
     border-radius: 4px;
     cursor: pointer;
 }
+
+/* Russian is a non-interactive sibling above YouTube's own English captions. */
+.ht-dual-subtitle {
+    position: absolute;
+    transform: translate(-50%, -100%);
+    box-sizing: border-box;
+    width: max-content;
+    padding: 2px 5px;
+    border-radius: 2px;
+    font-family: Arial, sans-serif;
+    line-height: 1.25;
+    text-align: center;
+    overflow-wrap: anywhere;
+    white-space: normal;
+    z-index: 100;
+    pointer-events: none;
+    text-shadow: 0 1px 2px #000;
+}
+.ht-dual-subtitle:empty { display: none; }
+.ht-dual-subtitle mark { color: inherit; background: rgba(255, 191, 0, .55); border-radius: 2px; }
+.ht-dual-subtitle[data-alignment="sentence"] mark { background: rgba(255, 191, 0, .28); }
+.ht-dual-subtitle[data-status="error"] { font-size: 14px !important; }

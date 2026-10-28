@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased] — independent Dual Subs fork
+
+- Added opt-in English–Russian dual captions with deduplicated cached translation, approximate cross-highlighting and stale-response protection while retaining hover/Shift and auto-pause.
+- Extended the local dictionary with optional sentence, video/time and note fields; editing, external dictionary links, Anki CSV and JSON backup import were added without replacing legacy entries.
+- Gave the fork distinct Chromium/Firefox identities, marked it as independent, and stopped opening the upstream uninstall survey. Storage is isolated across IDs; see migration instructions. Firefox is not verified for this fork.
+- Added focused unit, DOM integration and Playwright mock-player scenarios, and English/Russian fork documentation. A sample CSV was imported with the Anki engine; real YouTube, the Anki desktop UI and full extension E2E still require manual verification.
+
 ## [1.3.0] - 2026-10-22
 
 ### Changed
