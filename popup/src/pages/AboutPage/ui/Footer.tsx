@@ -12,7 +12,7 @@ export const Footer: FC = () => {
 
   const openChangelog = () => {
     chrome.tabs.create({
-      url: "https://github.com/kozii-d/hover-translate/blob/master/CHANGELOG.md"
+      url: "https://github.com/prost0human/hover-translate-dual-subs/blob/master/CHANGELOG.md"
     });
   };
 

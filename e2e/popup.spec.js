@@ -224,7 +224,11 @@ for (const colorScheme of ["light", "dark"]) {
       })),
     });
     const rating = await open();
-    await expect(rating.getByRole("button", { name: "Rate" })).toBeVisible();
+    if (require("../manifest.chrome.json").key) {
+      await expect(rating.getByRole("button", { name: "Rate" })).toBeVisible();
+    } else {
+      await expect(rating.getByRole("button", { name: "Rate" })).toHaveCount(0);
+    }
     await lowContrastOf(rating);
   });
 }

@@ -9,6 +9,12 @@ export interface SavedTranslation {
   transcription?: string; // Transcription string
   translatorName: string; // Name of the translator
   timestamp: number; // Timestamp (in milliseconds since epoch)
+  exampleOriginal?: string;
+  exampleTranslation?: string;
+  videoTitle?: string;
+  videoUrl?: string;
+  videoTimeSeconds?: number;
+  note?: string;
 }
 
 export interface TranslationToExport {
@@ -20,4 +26,10 @@ export interface TranslationToExport {
   "Transliteration": string;
   "Transcription": string;
   "Dictionary": string;
+  "Example"?: string;
+  "Example translation"?: string;
+  "Video title"?: string;
+  "Video URL"?: string;
+  "Video time (seconds)"?: string;
+  "Note"?: string;
 }

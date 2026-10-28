@@ -1,4 +1,5 @@
 import { AvailableLanguages } from "./languages.ts";
+import { TranslationData } from "./translations.ts";
 
 export interface GetAvailableLanguagesMessage {
   action: "getAvailableLanguages";
@@ -99,7 +100,16 @@ export interface OpenReviewPageMessage {
   action: "openReviewPage";
 }
 
+/** All dictionary mutations are serialized by the background worker. */
+export type DictionaryMessage =
+  | { action: "saveDictionaryEntry"; value: TranslationData }
+  | { action: "importDictionaryEntries"; value: TranslationData[] }
+  | { action: "updateDictionaryEntry"; value: { id: string; changes: Partial<TranslationData> } }
+  | { action: "removeDictionaryEntry"; value: { id: string } }
+  | { action: "clearDictionary" };
+
 export type ExtensionMessage =
+  | DictionaryMessage
   | GetAvailableLanguagesMessage
   | TranslateMessage
   | AbortTranslateMessage

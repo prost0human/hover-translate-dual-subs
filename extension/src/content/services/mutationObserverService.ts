@@ -9,6 +9,7 @@ import { VideoController } from "../core/videoController";
 import { TooltipService } from "./tooltipService.ts";
 import { CoveredCaptionPointerService } from "./coveredCaptionPointerService.ts";
 import { RatingPromptService } from "./ratingPromptService.ts";
+import { DualSubtitleService } from "./dualSubtitleService.ts";
 import { debugLog } from "../utils/debugLog.ts";
 
 const RETRY_CONFIG = {
@@ -60,6 +61,7 @@ export class MutationObserverService {
     private readonly videoController: VideoController,
     private readonly tooltipService: TooltipService,
     private readonly ratingPromptService: RatingPromptService,
+    private readonly dualSubtitleService: DualSubtitleService,
   ) {
     this.observer = new MutationObserver(this.handleMutations);
 
@@ -106,6 +108,7 @@ export class MutationObserverService {
       this.detachCaptionWindowListeners(captionWindow);
     });
 
+    this.dualSubtitleService.destroy();
     this.videoController.destroy();
     this.ratingPromptService.removeCard();
 
@@ -125,6 +128,12 @@ export class MutationObserverService {
     const removedLines = mutations.flatMap((mutation) => Array.from(mutation.removedNodes, this.findCaptionSegments).flat());
 
     mutations.forEach((mutation) => {
+      // YouTube can edit a text node in place without adding a node at all.
+      if (mutation.type === "characterData" || mutation.type === "childList") {
+        const target = mutation.target instanceof Element ? mutation.target : mutation.target.parentElement;
+        const segment = target?.closest<HTMLElement>(`.${CAPTION_SEGMENT}`);
+        if (segment?.isConnected) wordsChanged = this.subtitleCore.splitCaptionIntoSpans(segment, removedLines) || wordsChanged;
+      }
       // 1. Handle all added nodes.
       mutation.addedNodes.forEach((node) => {
         wordsChanged = this.handleAddedNode(node, removedLines) || wordsChanged;
@@ -140,6 +149,7 @@ export class MutationObserverService {
     // has no words to change, and lets the pointer through until they come.
     this.subtitleCore.updateCaptionWindowPointerEvents();
 
+    this.dualSubtitleService.sync();
     if (!wordsChanged) return;
 
     // 3. Reindex first — the selection is expressed in those indexes, so it can
@@ -192,7 +202,7 @@ export class MutationObserverService {
 
     // If it's an Element, check for caption segments inside
     if (node instanceof Element) {
-      const segments = node.querySelectorAll(`.${CAPTION_SEGMENT}`);
+      const segments = this.findCaptionSegments(node);
       segments.forEach((segment) => {
         if (segment instanceof HTMLElement) {
           wordsChanged =
@@ -202,9 +212,8 @@ export class MutationObserverService {
       this.subtitleCore.updateCaptionWindowSize();
 
       // If it's a caption window, add events for pause/play
-      if (node.classList.contains(CAPTION_WINDOW)) {
-        this.attachCaptionWindowListeners(node);
-      }
+      if (node.classList.contains(CAPTION_WINDOW)) this.attachCaptionWindowListeners(node);
+      node.querySelectorAll(`.${CAPTION_WINDOW}`).forEach((captionWindow) => this.attachCaptionWindowListeners(captionWindow));
     }
 
     // For auto-generated captions (TEXT_NODE inside CaptionSegment)
@@ -297,10 +306,14 @@ export class MutationObserverService {
     if (captionContainer) {
       this.observer.observe(captionContainer, {
         childList: true,
+        characterData: true,
+        attributes: true,
+        attributeFilter: ["style", "hidden", "aria-hidden"],
         subtree: true,
       });
       this.observedContainer = captionContainer;
       this.processExistingCaptions();
+      this.dualSubtitleService.setContainer(captionContainer);
       debugLog(
         LOG_MESSAGES.OBSERVING_STARTED,
         `containers=${document.querySelectorAll(`.${CAPTION_WINDOW_CONTAINER}`).length}`,
@@ -393,6 +406,7 @@ export class MutationObserverService {
   private stopObserving(): void {
     this.observer.disconnect();
     this.observedContainer = null;
+    this.dualSubtitleService.setContainer(null);
   }
 
   private clearRetryTimeout(): void {

@@ -9,15 +9,13 @@ export const Description: FC = () => {
   return (
     <Box>
       <Typography variant="h5" gutterBottom fontWeight="bold">
-        {t("blocks.description.title")}
+        {t("blocks.description.forkTitle")}
       </Typography>
       <Typography variant="subtitle1" component="p" color={"text.secondary"}>
         {t("blocks.description.subtitle")}
       </Typography>
       <Typography variant="subtitle1" component="p" color={"text.secondary"}>
-        {t("blocks.description.thank-you")}
-        {" "}
-        <Box component="span" sx={{ color: "error.main" }}>❤️</Box>
+        {t("blocks.description.forkNotice")}
       </Typography>
     </Box>
   );

@@ -102,6 +102,7 @@ describe("getReviewPageUrl: the store is told by the install", () => {
     ["moz-extension", "moz-extension://1b2c3d4e-0000-4000-8000-000000000000/", "{C49CC196-68CC-441D-9224-2A05F1A073BF}",
       "https://addons.mozilla.org/firefox/addon/hovertranslate/"],
     ["an unpacked build", `chrome-extension://${UNPACKED_ID}/`, UNPACKED_ID, null],
+    ["a Firefox fork", "moz-extension://fork/", "hover-translate-dual-subs@prost0human.github.io", null],
   ])("%s", (_, url, id, expected) => {
     expect(getReviewPageUrl(url, id)).toBe(expected);
   });

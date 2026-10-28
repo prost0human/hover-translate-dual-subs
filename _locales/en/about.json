@@ -5,10 +5,12 @@
     "description": {
       "title": "HoverTranslate",
       "subtitle": "Build vocabulary while watching YouTube!",
-      "thank-you": "Thank you for choosing my extension!"
+      "thank-you": "Thank you for choosing my extension!",
+      "forkNotice": "Independent fork of HoverTranslate by Dmytro Kozii; not the original store release.",
+      "forkTitle": "HoverTranslate Dual Subs (fork)"
     },
     "support": {
-      "title": "Support the Project",
+      "title": "Support the original project",
       "actions": {
         "review": {
           "text": "Rate us"
@@ -21,7 +23,8 @@
     "contacts": {
       "title": "Get in Touch",
       "github": "View Source Code on GitHub",
-      "reportIssues": "Report Issues on GitHub"
+      "reportIssues": "Report Issues on GitHub",
+      "upstream": "Original HoverTranslate by Dmytro Kozii"
     },
     "tips": {
       "title": "Quick Tips",

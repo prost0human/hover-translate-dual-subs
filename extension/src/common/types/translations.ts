@@ -12,4 +12,10 @@ export interface TranslationCacheData {
 export interface TranslationData extends TranslationCacheData {
   id: string; // Unique identifier for the translation
   timestamp: number; // Timestamp (in milliseconds since epoch)
+  exampleOriginal?: string;
+  exampleTranslation?: string;
+  videoTitle?: string;
+  videoUrl?: string;
+  videoTimeSeconds?: number;
+  note?: string;
 }

@@ -23,6 +23,23 @@
     "exportCSV": {
       "text": "Экспортировать CSV",
       "tooltip": "Экспортировать переводы в CSV"
+    },
+    "openDictionary": {
+      "tooltip": "Открыть во внешнем словаре"
+    },
+    "editTranslation": {
+      "tooltip": "Редактировать перевод"
+    },
+    "exportAnki": {
+      "text": "Экспорт CSV для Anki",
+      "tooltip": "Экспортировать шесть полей для Anki",
+      "failed": "Не удалось экспортировать CSV для Anki."
+    },
+    "importJSON": {
+      "text": "Импортировать JSON",
+      "tooltip": "Объединить экспортированный словарь HoverTranslate",
+      "success": "Добавлено: {{imported}}; пропущено дублей: {{skipped}}.",
+      "failed": "Не удалось импортировать словарь JSON."
     }
   },
   "modals": {
@@ -35,5 +52,19 @@
   "emptyState": {
     "title": "Словарь пуст",
     "description": "Нажмите на слово или фразу в субтитрах, чтобы сохранить их в словарь"
+  },
+  "fields": {
+    "originalText": "Английское слово или выражение",
+    "translatedText": "Перевод",
+    "exampleOriginal": "Пример на английском",
+    "exampleTranslation": "Перевод примера",
+    "note": "Заметка",
+    "videoSource": "Источник видео"
+  },
+  "edit": {
+    "title": "Редактировать запись словаря",
+    "cancel": "Отмена",
+    "save": "Сохранить",
+    "saveFailed": "Не удалось сохранить запись."
   }
 }

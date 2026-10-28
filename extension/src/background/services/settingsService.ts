@@ -6,10 +6,9 @@ import type { Settings, TooltipTheme } from "../../common/types/settings.ts";
 import { TranslatorFactory } from "../../common/translators/TranslatorFactory.ts";
 import { findUserLanguage } from "../../common/translators/findClosestLanguage.ts";
 
-// The site's page that asks why the extension was removed. Nothing is added to
-// the address: no version, browser or language (in Firefox those would be data
-// the viewer has to be able to refuse).
-const UNINSTALL_PAGE_URL = "https://hovertranslate.app/uninstall/";
+// Do not direct this independent fork's users to the upstream uninstall survey.
+// The empty URL also clears any previously registered survey for this ID.
+const UNINSTALL_PAGE_URL = "";
 
 // The page that shows a new viewer what to do (`popup/welcome.html`, built by the popup).
 const WELCOME_PAGE = "popup/dist/welcome.html";

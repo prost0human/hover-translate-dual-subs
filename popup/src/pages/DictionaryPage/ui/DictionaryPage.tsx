@@ -15,6 +15,7 @@ import { ExportData } from "@/features/ExportTranslations";
 import { useNotifications } from "@/shared/lib/notifications/notifications.ts";
 import { toTag } from "@/shared/lib/helpers/languageNames.ts";
 import { ErrorState } from "@/shared/ui/ErrorState/ErrorState.tsx";
+import { sendMessage } from "@/shared/lib/helpers/sendMessage.ts";
 
 const MAX_TRANSLATIONS_PER_PAGE = 25;
 
@@ -41,7 +42,7 @@ const DictionaryPage: FC = () => {
     return chunkTranslationsByDay(translationsToShow);
   }, [translationsToShow]);
 
-  const { set, get } = useStorage();
+  const { get } = useStorage();
 
   const notifications = useNotifications();
 
@@ -63,26 +64,37 @@ const DictionaryPage: FC = () => {
 
   const removeTranslationById = useCallback(async (id: string) => {
     try {
-      const updatedTranslations = allTranslations.filter(translation => translation.id !== id);
-      setAllTranslations(updatedTranslations);
-      await set<Translation[]>("savedTranslations", updatedTranslations, "local");
+      await sendMessage({ action: "removeDictionaryEntry", value: { id } });
+      setAllTranslations((entries) => entries.filter((entry) => entry.id !== id));
     } catch (error) {
       const errorMessage = "Failed to remove translation";
       notifications.show(errorMessage, { severity: "error", autoHideDuration: 5000 });
       console.error(errorMessage, error);
     }
-  }, [allTranslations, set, notifications]);
+  }, [notifications]);
+
+  const editTranslation = useCallback(async (id: string, changes: Partial<Translation>): Promise<boolean> => {
+    try {
+      await sendMessage({ action: "updateDictionaryEntry", value: { id, changes } });
+      setAllTranslations((entries) => entries.map((entry) => entry.id === id ? { ...entry, ...changes } : entry));
+      return true;
+    } catch (error) {
+      notifications.show(t("edit.saveFailed"), { severity: "error", autoHideDuration: 5000 });
+      console.error("Failed to update translation", error);
+      return false;
+    }
+  }, [notifications, t]);
 
   const clearAllTranslations = useCallback(async () => {
     try {
+      await sendMessage({ action: "clearDictionary" });
       setAllTranslations([]);
-      await set<Translation[]>("savedTranslations", [], "local");
     } catch (error) {
       const errorMessage = "Failed to clear all translations";
       notifications.show(errorMessage, { severity: "error", autoHideDuration: 5000 });
       console.error(errorMessage, error);
     }
-  }, [set, notifications]);
+  }, [notifications]);
 
   const showNextPage = () => {
     setPage((prev) => prev + 1);
@@ -90,6 +102,13 @@ const DictionaryPage: FC = () => {
 
   useEffect(() => {
     getTranslations();
+    const changed = (changes: Record<string, chrome.storage.StorageChange>, area: string) => {
+      if (area === "local" && changes.savedTranslations) {
+        setAllTranslations((changes.savedTranslations.newValue as Translation[] | undefined) ?? []);
+      }
+    };
+    chrome.storage.onChanged.addListener(changed);
+    return () => chrome.storage.onChanged.removeListener(changed);
   }, [getTranslations]);
 
   if (loading) {
@@ -123,6 +142,7 @@ const DictionaryPage: FC = () => {
                     key={translation.id}
                     translation={translation}
                     onRemove={removeTranslationById}
+                    onEdit={editTranslation}
                     isLast={index === translations.length - 1}
                   />
                 );

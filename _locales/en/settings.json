@@ -152,5 +152,17 @@
   "youtubeAccess": {
     "text": "HoverTranslate has no access to YouTube, so it can't translate subtitles. Allow access, then reload the YouTube page.",
     "allow": "Allow access"
+  },
+  "dual": {
+    "enabled": "Dual subtitles (English → Russian)",
+    "helper": "Turn on English captions in YouTube. Visible lines are sent to your selected translator; the original captions stay interactive. Set “Translate to” to Russian for word lookups.",
+    "showRussian": "Show Russian line",
+    "crossHighlight": "Cross-highlight translation",
+    "fontSize": "Russian text size",
+    "textOpacity": "Text opacity",
+    "backgroundOpacity": "Background opacity",
+    "verticalGap": "Gap above original",
+    "saveFailed": "Could not save subtitle settings.",
+    "loadFailed": "Could not load dual subtitle settings. Reopen settings to try again."
   }
 }

@@ -20,6 +20,7 @@ import {
 } from "../model/types/schema.ts";
 import { SettingsFormSkeleton } from "./skeletons/SettingsFormSkeleton.tsx";
 import { ContextHint } from "./ContextHint.tsx";
+import { DualSubtitleSettingsForm } from "./DualSubtitleSettingsForm.tsx";
 import { DismissibleTip } from "@/shared/ui/DismissibleTip/DismissibleTip.tsx";
 import { SettingsSelect } from "@/shared/ui/SettingsSelect/SettingsSelect.tsx";
 import { LanguageOption, LanguageSelect } from "@/shared/ui/LanguageSelect/LanguageSelect.tsx";
@@ -547,6 +548,7 @@ export const SettingsForm: FC<SettingsFormProps> = ({
             {t("tips.multipleSelection")}
           </DismissibleTip>
         )}
+        <DualSubtitleSettingsForm/>
         <Controller
           name="autoPause"
           control={control}

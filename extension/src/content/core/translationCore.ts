@@ -244,8 +244,8 @@ export class TranslationCore {
    * each key would multiply its size. Without context the key is exactly what
    * it always was, so Google and Bing keep their accumulated cache.
    */
-  private getCacheKey(normalizedText: string, context?: string): string {
-    const key = `${normalizedText}_${state.settings.sourceLanguageCode}_${state.settings.targetLanguageCode}_${this.translator.key}`;
+  private getCacheKey(normalizedText: string, context?: string, languages: { sourceLanguageCode: string; targetLanguageCode: string } = state.settings): string {
+    const key = `${normalizedText}_${languages.sourceLanguageCode}_${languages.targetLanguageCode}_${this.translator.key}`;
 
     return context ? `${key}_${hashString(context)}` : key;
   }
@@ -266,7 +266,14 @@ export class TranslationCore {
     return this.translationCache.has(cacheKey);
   }
 
-  async translateText(text: string, context?: string, signal?: AbortSignal): Promise<TranslationCacheData | null> {
+  async translateText(
+    text: string,
+    context?: string,
+    signal?: AbortSignal,
+    languages?: { sourceLanguageCode: string; targetLanguageCode: string },
+  ): Promise<TranslationCacheData | null> {
+    // Capture the pair at request time: settings can change while a request is in flight.
+    const { sourceLanguageCode, targetLanguageCode } = languages ?? state.settings;
     // What is translated, cached and saved; the context is matched against the
     // selection itself.
     const normalizedText = trimEdgePunctuation(text);
@@ -276,7 +283,7 @@ export class TranslationCore {
     }
 
     const effectiveContext = this.getEffectiveContext(text, context);
-    const cacheKey = this.getCacheKey(normalizedText, effectiveContext);
+    const cacheKey = this.getCacheKey(normalizedText, effectiveContext, { sourceLanguageCode, targetLanguageCode });
 
     if (this.translationCache.has(cacheKey)) {
       const cachedData = this.translationCache.get(cacheKey);
@@ -289,8 +296,8 @@ export class TranslationCore {
     try {
       const translatedData = await this.translator.translate(
         normalizedText,
-        state.settings.sourceLanguageCode,
-        state.settings.targetLanguageCode,
+        sourceLanguageCode,
+        targetLanguageCode,
         signal,
         effectiveContext,
       );
@@ -301,7 +308,7 @@ export class TranslationCore {
 
       const result: TranslationCacheData = {
         sourceLanguageCode: translatedData.detectedLanguageCode,
-        targetLanguageCode: state.settings.targetLanguageCode,
+        targetLanguageCode,
         translatedText: translatedData.translatedText,
         originalText: normalizedText,
         dictionary: translatedData.dictionary,

@@ -5,10 +5,12 @@
     "description": {
       "title": "HoverTranslate",
       "subtitle": "Пополняйте словарный запас при просмотре YouTube!",
-      "thank-you": "Спасибо за использование моего расширения!"
+      "thank-you": "Спасибо за использование моего расширения!",
+      "forkNotice": "Независимый форк HoverTranslate Дмитрия Козия; не является оригинальной версией из магазина.",
+      "forkTitle": "HoverTranslate Dual Subs (форк)"
     },
     "support": {
-      "title": "Поддержать проект",
+      "title": "Поддержать оригинальный проект",
       "actions": {
         "review": {
           "text": "Оценить нас"
@@ -21,7 +23,8 @@
     "contacts": {
       "title": "Связаться",
       "github": "Посмотреть исходный код на GitHub",
-      "reportIssues": "Сообщить о проблемах на GitHub"
+      "reportIssues": "Сообщить о проблемах на GitHub",
+      "upstream": "Оригинальный HoverTranslate Дмитрия Козия"
     },
     "tips": {
       "title": "Быстрые советы",

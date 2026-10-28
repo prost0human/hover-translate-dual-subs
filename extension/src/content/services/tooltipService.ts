@@ -14,7 +14,9 @@ import { isShiftHeld } from "../utils/shiftKey.ts";
 import { RatingPromptService } from "./ratingPromptService.ts";
 import { MIN_CACHED_TRANSLATIONS, MIN_SAVED_WORDS } from "../../common/ratingPrompt.ts";
 import { TranslationCore } from "../core/translationCore";
-import { StorageService } from "../../common/services/storageService.ts";
+import { DualSubtitleService } from "./dualSubtitleService.ts";
+import { getCaptionText } from "../utils/subtitleText.ts";
+import { getVideoContext } from "../utils/videoContext.ts";
 import { state } from "../state/stateManager.ts";
 import { TranslationCacheData, TranslationData } from "../../common/types/translations.ts";
 import { TranslatorErrorCode, isTranslatorError } from "../../common/translators/translatorError.ts";
@@ -91,7 +93,7 @@ export class TooltipService {
   constructor(
     private readonly translationCore: TranslationCore,
     private readonly ratingPromptService: RatingPromptService,
-    private readonly storageService: StorageService = new StorageService(),
+    private readonly dualSubtitleService: DualSubtitleService,
   )
   {
     this.selectedWordsNodes = new Set<HTMLElement>();
@@ -141,8 +143,13 @@ export class TooltipService {
     // Delete link to abortController after request is done
     delete targetNode.abortController;
 
-    if (!translatedData) return;
+    if (!translatedData || textToTranslate !== this.getSelectedText() || abortController.signal.aborted) return;
 
+    this.dualSubtitleService.setSelection(
+      targetNode.closest<HTMLElement>(`.${CAPTION_WINDOW}`),
+      textToTranslate,
+      translatedData.targetLanguageCode.toLowerCase().startsWith("ru") ? translatedData.translatedText : undefined,
+    );
     this.showSessionNotice(player);
 
     // The window the hovered word sits in. Taking the first one on the page
@@ -299,7 +306,11 @@ export class TooltipService {
     if (isCaptionWindowInUpperHalf(subtitlesContainer)) {
       topPosition = rectSubtitlesContainer.bottom + TOOLTIP_GAP + window.scrollY;
     } else {
-      topPosition = rectSubtitlesContainer.top - tooltipHeight - TOOLTIP_GAP + window.scrollY;
+      // The sentence overlay occupies the old tooltip position. Keep the
+      // word card above it instead of covering the Russian sentence.
+      const overlay = this.dualSubtitleService.getOverlay(subtitlesContainer);
+      const top = overlay ? Math.min(rectSubtitlesContainer.top, overlay.getBoundingClientRect().top) : rectSubtitlesContainer.top;
+      topPosition = top - tooltipHeight - TOOLTIP_GAP + window.scrollY;
     }
     tooltip.style.top = `${topPosition}px`;
 
@@ -478,6 +489,7 @@ export class TooltipService {
     this.activeTranslation = null;
     this.selectedWordsNodes.forEach((word) => word.classList.remove(TOOLTIP_SELECTED_WORD_CLASS));
     this.selectedWordsNodes.clear();
+    this.dualSubtitleService.clearSelection();
   };
 
   /** Drops a translation that was scheduled but not started yet. */
@@ -492,6 +504,8 @@ export class TooltipService {
       if (!this.selectedWordsNodes.has(target)) {
         this.updateSelectedWords(target);
       }
+
+      this.dualSubtitleService.setSelection(target.closest<HTMLElement>(`.${CAPTION_WINDOW}`), this.getSelectedText());
 
       // The selection is highlighted straight away; only the request waits.
       this.cancelPendingTooltip();
@@ -600,46 +614,32 @@ export class TooltipService {
     );
   }
 
-  private isSameSavedTranslation = (translationData1: TranslationData, translationData2: TranslationData) => {
-    return translationData1.sourceLanguageCode === translationData2.sourceLanguageCode &&
-      translationData1.translatedText === translationData2.translatedText &&
-      translationData1.originalText === translationData2.originalText &&
-      translationData1.targetLanguageCode === translationData2.targetLanguageCode;
-  };
-
   public saveTranslationToDictionary = async (wordNode: HTMLElement) => {
-    // Found before anything is awaited: the captions may change meanwhile.
+    // Snapshot all context before awaiting: YouTube may replace the caption or
+    // navigate while a translator answers.
     const player = wordNode.closest<HTMLElement>(`.${VIDEO_PLAYER}`);
     const captionWindow = wordNode.closest<HTMLElement>(`.${CAPTION_WINDOW}`);
+    const exampleOriginal = captionWindow ? getCaptionText(captionWindow) : "";
+    const exampleTranslation = this.dualSubtitleService.getTranslation(captionWindow, exampleOriginal);
+    const videoContext = getVideoContext(player);
 
     const currentData = await this.resolveTranslationForAction(player);
     if (!currentData) return;
 
     let savedCount: number;
-
     try {
-      const savedTranslations = await this.storageService.get<TranslationData[]>("savedTranslations", "local");
-      const savedTranslationsArray = savedTranslations || [];
-
-      const newSavedTranslation: TranslationData  = {
+      const newSavedTranslation: TranslationData = {
         id: crypto.randomUUID(),
         ...currentData,
         timestamp: Date.now(),
+        ...(exampleOriginal ? { exampleOriginal } : {}),
+        ...(exampleTranslation ? { exampleTranslation } : {}),
+        ...videoContext,
       };
-
-      // Remove the current translation from the saved translations array to avoid duplicates
-      const filteredTranslations = savedTranslationsArray.filter((translation) => {
-        return !this.isSameSavedTranslation(translation, newSavedTranslation);
-      });
-
-      filteredTranslations.unshift(newSavedTranslation);
-
-      await this.storageService.set("savedTranslations", filteredTranslations, "local");
-      savedCount = filteredTranslations.length;
+      // The background is the single writer across every tab and the popup.
+      const result = await sendMessageToBackground<{ count: number }>({ action: "saveDictionaryEntry", value: newSavedTranslation });
+      savedCount = result.count;
     } catch (error) {
-      // Running out of the local storage quota is the realistic cause. Nothing
-      // awaits this handler, so the write used to vanish without a trace: no
-      // saved word, no message, and an unhandled rejection as the only sign.
       console.error("Saving the translation failed", error);
       this.hadFailure = true;
       this.showNotificationTooltip(chrome.i18n.getMessage("saveFailed"), player, true);
@@ -647,7 +647,6 @@ export class TooltipService {
     }
 
     this.showNotificationTooltip(chrome.i18n.getMessage("translationSaved"), player);
-
     if (captionWindow && !this.hadFailure && savedCount >= MIN_SAVED_WORDS) {
       this.ratingPromptService.offer(captionWindow);
     }

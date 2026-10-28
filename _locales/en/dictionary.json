@@ -23,6 +23,23 @@
     "exportCSV": {
       "text": "Export CSV",
       "tooltip": "Export translations to CSV"
+    },
+    "openDictionary": {
+      "tooltip": "Open in an external dictionary"
+    },
+    "editTranslation": {
+      "tooltip": "Edit translation"
+    },
+    "exportAnki": {
+      "text": "Export Anki CSV",
+      "tooltip": "Export six fields for Anki",
+      "failed": "Could not export Anki CSV."
+    },
+    "importJSON": {
+      "text": "Import JSON backup",
+      "tooltip": "Merge an exported HoverTranslate JSON dictionary",
+      "success": "Imported {{imported}}; skipped {{skipped}} duplicates.",
+      "failed": "Could not import the JSON dictionary."
     }
   },
   "modals": {
@@ -35,5 +52,19 @@
   "emptyState": {
     "title": "Dictionary is empty",
     "description": "Click on a word or phrase in the subtitles to save them to the dictionary"
+  },
+  "fields": {
+    "originalText": "English word or phrase",
+    "translatedText": "Translation",
+    "exampleOriginal": "Example in English",
+    "exampleTranslation": "Example translation",
+    "note": "Note",
+    "videoSource": "Video source"
+  },
+  "edit": {
+    "title": "Edit dictionary entry",
+    "cancel": "Cancel",
+    "save": "Save",
+    "saveFailed": "Could not save the entry."
   }
 }

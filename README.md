@@ -1,106 +1,93 @@
-# HoverTranslate — YouTube subtitle translator for language learners
+# HoverTranslate Dual Subs
 
-[![Chrome Web Store rating](https://img.shields.io/chrome-web-store/rating/jbddomeagbjjdoaehkdffdhifdhnmfic?logo=googlechrome&logoColor=white&label=Chrome)](https://chromewebstore.google.com/detail/jbddomeagbjjdoaehkdffdhifdhnmfic)
-[![Chrome Web Store users](https://img.shields.io/chrome-web-store/users/jbddomeagbjjdoaehkdffdhifdhnmfic?logo=googlechrome&logoColor=white&label=users)](https://chromewebstore.google.com/detail/jbddomeagbjjdoaehkdffdhifdhnmfic)
-[![Firefox Add-ons rating](https://img.shields.io/amo/rating/hovertranslate?logo=firefoxbrowser&logoColor=white&label=Firefox)](https://addons.mozilla.org/firefox/addon/hovertranslate/)
-[![Firefox Add-ons users](https://img.shields.io/amo/users/hovertranslate?logo=firefoxbrowser&logoColor=white&label=users)](https://addons.mozilla.org/firefox/addon/hovertranslate/)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[Русская версия](README.ru.md) · [Build details](BUILD_INSTRUCTIONS.md) · [Contributing](CONTRIBUTING.md) · [Third-party notices](THIRD_PARTY_NOTICES.md)
 
-HoverTranslate is a free, open-source browser extension for Chrome, Firefox and Edge that translates words in YouTube subtitles as you hover over them. It is made for people who learn a language from videos: point at a word you don't know, and its translation appears right above the subtitles, while the video waits for you.
+An **independent fork** of [HoverTranslate](https://github.com/kozii-d/hover-translate) by Dmytro Kozii (MIT). It retains the original hover translator and adds an opt-in English → Russian subtitle line, contextual vocabulary, and Anki export for learning English on YouTube. This is **not** the upstream Chrome Web Store extension or an official release. Report fork-specific problems in [this fork's issues](https://github.com/prost0human/hover-translate-dual-subs/issues), not upstream.
 
-**Install:** [Chrome Web Store](https://chromewebstore.google.com/detail/jbddomeagbjjdoaehkdffdhifdhnmfic) · [Firefox Add-ons](https://addons.mozilla.org/firefox/addon/hovertranslate/) · [Microsoft Edge Add-ons](https://microsoftedge.microsoft.com/addons/detail/emnbmkhbohfjmbkdipkppnbdlhgnhmhm)
+For attribution and migration only, the **original**, unmodified extension's listings are [Chrome Web Store](https://chromewebstore.google.com/detail/jbddomeagbjjdoaehkdffdhifdhnmfic), [Firefox Add-ons](https://addons.mozilla.org/firefox/addon/hovertranslate/) and [Edge Add-ons](https://microsoftedge.microsoft.com/addons/detail/emnbmkhbohfjmbkdipkppnbdlhgnhmhm). These links do **not** install this fork or its dual-subtitle features.
 
-**Website:** [hovertranslate.app](https://hovertranslate.app/)
+## What it does
 
-![Hovering over a word in YouTube subtitles shows its translation, and holding Shift translates a phrase](docs/translate.gif)
+- Keeps YouTube's English captions and existing word hover, Shift multi-word selection, click action, auto-pause, translator choices, appearance controls and local dictionary. When enabled, a non-interactive Russian line appears immediately **above** the native captions.
+- Debounces changing caption lines, reuses a persistent bounded translation cache, coalesces identical in-flight requests and discards/aborts obsolete responses. Subtitle translation uses the selected translator with an explicit `en → ru` pair. Word translations still use the original language settings.
+- Highlights a Russian translation on English hover/selection **approximately**: a unique literal or conservative inflection match for the selected text's translation is used; otherwise the entire Russian sentence is highlighted. It is not a word-alignment model, and even a literal match can be linguistically wrong. No unsupported positional equivalence is asserted.
+- Saves the selected word/phrase with available source sentence, Russian sentence, video title, timestamped YouTube link and a user note. Old dictionary records remain readable; edit text, examples and notes in Dictionary. Repeated identical entries are merged without replacing an existing note or context.
+- Opens Cambridge English–Russian, Reverso Context and Multitran **links** for a saved expression; no dictionary scraping. Export an Anki CSV or the existing JSON/CSV formats, and import a JSON backup from the original extension.
+- Has English and Russian UI strings; newly added strings in other supported languages fall back to English. No account or paid API is required for the default Google translator. DeepL requires your own key; Bing and DeepL request their existing optional permissions.
 
-## Why HoverTranslate
+## Install from source (Chrome, Edge, Brave)
 
-Most subtitle tools translate the whole line or show a second line of subtitles under the first. HoverTranslate does something smaller on purpose: it translates **the one word or phrase you point at**, so you still read the original and only look up what you actually don't know. No copying words into a translator, no switching tabs, no losing the thread.
-
-## Features
-
-- **Hover to translate.** Point at a word in the subtitles and its translation appears above it. Hold <kbd>Shift</kbd> and sweep across several words to translate a phrase or an idiom — or turn on "Always enable multiple selection" to do it without Shift.
-- **Auto-pause.** The video pauses while the pointer is on the subtitles and plays on when you move away. You can turn this off.
-- **Your own word list.** Click a word to save it together with its translation. Export the list as CSV or JSON to review your new words later, for example in a spreadsheet. A click can copy the word or its translation instead, if you prefer.
-- **Auto-generated subtitles.** Works with the subtitles YouTube creates itself, so videos without subtitles from the creator work too.
-- **Chinese, Japanese and Thai.** These languages are written without spaces between words, and HoverTranslate still picks out the single word under the pointer instead of translating the whole line (Chrome and Edge; Firefox 125 and newer).
-- **Embedded players.** Works in YouTube videos embedded on other websites — blogs, online courses, news articles — not only on youtube.com.
-- **More than 240 languages.** The subtitle language is detected automatically; you pick the language to translate into.
-- **Google, Bing or DeepL.** Google works out of the box. Bing asks for access to <www.bing.com> the first time you pick it. DeepL works with your own free DeepL API key, which is stored only on your device and sent only to DeepL.
-- **Context-aware translation with DeepL.** With DeepL, each word is translated in the context of its whole subtitle line, so a word with several meanings gets the one it has there: "bank" in "we sat on the bank of the river" is a riverbank, not a bank. The surrounding line is not counted against your DeepL allowance.
-- **Looks like your subtitles.** The translation follows your YouTube subtitle style, or you can pick your own font, colors and size.
-
-![Clicking a word saves it to the word list, which can be exported as CSV](docs/dictionary.gif)
-
-## Free and private
-
-HoverTranslate is free: no account, no subscription, no ads, no analytics.
-
-- The words you hover are sent only to the translator you chose (Google, Bing or DeepL) to be translated. With DeepL, the subtitle line around the word is sent too, for context.
-- Your word list and the translation cache stay in your browser.
-- Your settings are kept in your browser's storage and synced by your browser if you use its sync.
-- A DeepL API key is stored only on your device.
-
-The whole extension is open source under the [MIT License](LICENSE), so you can check all of this in the code. The details are in the [privacy policy](https://hovertranslate.app/privacy/).
-
-## FAQ
-
-**Does it work on Netflix or other video sites?**
-No. HoverTranslate works on YouTube: on youtube.com and in YouTube players embedded on other websites. It does not support Netflix, Prime Video, Disney+ or other platforms.
-
-**Does it show dual subtitles or translate the whole subtitle line?**
-No. It translates the word or phrase under your pointer. The original subtitles stay as they are.
-
-**Do I need a DeepL API key?**
-Only if you want to use DeepL. Google and Bing work without a key. DeepL's free API plan covers 500,000 characters a month; the key is free to create at [deepl.com/pro-api](https://www.deepl.com/pro-api).
-
-**Which browsers are supported?**
-Chrome and Edge 102 or newer, Firefox 115 or newer, on desktop. There is no mobile version.
-
-**Are there known limitations?**
-
-- Videos embedded in "privacy-enhanced mode" (`youtube-nocookie.com`) are not supported yet.
-- In Firefox older than 125, Chinese, Japanese and Thai subtitle lines are translated as a whole rather than word by word.
-
-## What's new
-
-See the [changelog](CHANGELOG.md) for every release.
-
-## Feedback
-
-- Bug reports and feature requests: [GitHub Issues](https://github.com/kozii-d/hover-translate/issues)
-- Email: <hovertranslate@gmail.com>
-
-If HoverTranslate helps you learn, a rating in the [Chrome Web Store](https://chromewebstore.google.com/detail/jbddomeagbjjdoaehkdffdhifdhnmfic), on [Firefox Add-ons](https://addons.mozilla.org/firefox/addon/hovertranslate/) or on [Edge Add-ons](https://microsoftedge.microsoft.com/addons/detail/emnbmkhbohfjmbkdipkppnbdlhgnhmhm) helps other learners find it.
-
-## Development
-
-Three npm packages (`extension/`, `popup/` and the root), built with Vite and TypeScript; the popup uses React.
+Prerequisites: Node.js **24.12.0+**, npm **11.6.2+**, and Linux/macOS or WSL (the scripts use `cp`/`rm`). `npm ci` uses the three checked-in lockfiles.
 
 ```bash
-npm ci && (cd extension && npm ci) && (cd popup && npm ci)
-npm run setup:chrome   # or setup:edge / setup:firefox — picks the browser's manifest
-npm run watch          # rebuilds on change
+npm ci
+npm ci --prefix extension
+npm ci --prefix popup
+npm run setup:chrome          # Edge may also use npm run setup:edge
+npm run build
 ```
 
-Then load the **repository root** as an unpacked extension (`chrome://extensions` → Developer mode → Load unpacked; in Firefox, `about:debugging` → Load Temporary Add-on → `manifest.json`).
+Open `chrome://extensions`, `edge://extensions`, or `brave://extensions`, enable **Developer mode**, choose **Load unpacked**, and select the **repository root** (the folder containing generated `manifest.json`), not `extension/dist`. Pin the extension if desired, and reload YouTube tabs already open. You can keep the original installed, but temporarily disable it on YouTube to prevent both copies modifying the same captions. Rebuild and press the extension's Reload button after source changes.
 
-`npm run build` makes a production build. Step-by-step build instructions, as used for the Firefox Add-ons review, are in [BUILD_INSTRUCTIONS.md](BUILD_INSTRUCTIONS.md).
+The unpacked Chrome manifest deliberately contains **no upstream public key**. Chromium assigns a fork-specific ID, normally tied to its installed path; moving/reinstalling may give a different ID and separate storage. Back up the dictionary before moving it. For a production store release, establish the fork's own signing identity, review the inherited store listing/site, privacy policy and permissions, and publish separately. The source-archive script includes tracked files only, so commit newly added sources before generating a release source archive. The inherited Firefox manifest now has a different fork ID to avoid impersonating upstream; Firefox is **not tested or claimed supported** by this fork. The inherited upstream GitHub Pages deployment is disabled for forks until its site is replaced.
+
+### Migrate an existing HoverTranslate dictionary
+
+A different extension ID means the browser does **not** share or automatically migrate storage, settings, cache or API keys. Do not uninstall the old copy until you have verified the new one:
+
+1. In the **old** extension open **Dictionary → Export JSON**, and keep the file as a backup.
+2. Build/load this fork, open **Dictionary → Import JSON backup**, and choose the file. Confirm the imported/duplicate counts and inspect a few words.
+3. Re-enter settings and any optional translator credentials. The backup contains dictionary entries only; old exports cannot supply sentence/video metadata that was never saved.
+
+The importer accepts the original formatted JSON array and this fork's JSON export, up to **5 MB / 10,000 entries** per file. Each record must have a non-empty original and translation; validation happens before a single serialized merge. Duplicates (same original, translation and language pair, case-insensitive) are skipped and existing entries win. Conflicting IDs are replaced. Formatted legacy dates are interpreted in the local timezone with second precision; unrecognized dates use the import time. JSON is not a complete profile backup. The fork keeps using the original `savedTranslations` local storage key, with optional new fields, when upgrading a copy *with the same ID*.
+
+## Use on YouTube
+
+1. Open a video, turn on **CC**, and select an **English** subtitle track in the player. The feature reads visible caption DOM, not YouTube's transcript API. It uses a script heuristic, not reliable language detection; manually select English.
+2. Extension → **Settings**: set **Translate to → Russian** for word/phrase lookups. Enable **Dual subtitles (English → Russian)**. Switch the Russian line and cross-highlight independently; adjust font size, opacity, background and vertical gap. Enable **Auto pause** if desired.
+3. Hover a word. Hold **Shift** and move across adjacent English words to select a phrase (or use the existing always-multiple-selection option). The Russian overlay doesn't intercept pointer events. With the default click action, click the selection to save it. Move the pointer away to resume **only** a video the extension itself paused; a video already paused by you is not resumed. Pressing pause while the extension has already paused the video is not always distinguishable from no action.
+4. In **Dictionary**, expand/edit a record to inspect or correct the word, translation, examples and note. Use its video link or external-dictionary menu. If the sentence translation wasn't ready when you saved, its field may be empty; you can edit it.
+
+Automatic captions update frequently and may flicker or overlap the overlay while changing; some layouts/fullscreen/embedded players, drag behavior, live captions or YouTube DOM changes may need adjustment. A translator can fail, rate-limit, change wording or return a poor translation. Dual lines send **whole visible caption lines** to the selected provider, in addition to any hovered selections; disable the feature to stop those full-line requests. See Privacy below.
+
+## Export to Anki
+
+1. Open **Dictionary → Export Anki CSV**. The UTF-8 comma-separated file has six columns in this order: **English**, **Russian**, **Example**, **Example translation**, **Video URL**, **Note**. Values are escaped and quoted as needed; potentially executable spreadsheet-formula prefixes are prefixed with an apostrophe. Other CSV/JSON export actions remain available.
+2. In desktop Anki, create a deck and a custom note type with matching six fields if you want all context (the built-in Basic type only has Front/Back). Use **File → Import**, select the CSV, set **Comma** if needed, choose the deck/note type and map the six fields. For Basic, map only the first two; the rest will not be retained.
+3. The file begins with Anki's `#separator`, `#html:false`, and `#columns` directives, so a column-header row isn't imported as a card in supported versions (Anki **2.1.54+**). Review the preview and duplicate/update behavior before importing, then check both sides and the video URL. See the [Anki text import manual](https://docs.ankiweb.net/importing/text-files.html). No AnkiConnect integration is required or implemented.
+
+A sample produced by the exporter was imported into an isolated collection using the Anki 26.9.3 engine: two notes, six fields, Cyrillic, quotes, a multiline field and a `#`-prefixed word were verified. The desktop Anki UI has not been manually tested. Verify with a small sample and back up your collection before a large import. The Anki-specific directives are comments rather than ordinary CSV rows; some spreadsheet tools may show them as rows.
+
+## Manual acceptance checklist
+
+Run on a real Chromium-based browser with a real English-captioned YouTube video; this is not a substitute for automated fixtures:
+
+- [ ] In Settings select Russian, enable dual subtitles and auto-pause; turn on English CC. Confirm Russian above English, readability, seek/resize/fullscreen and no duplicate Russian line after switching videos. Try disabling each new toggle and re-enabling it; native hover/Shift must still work.
+- [ ] Find or create a caption containing **“back down”**. Hover **back**, hold Shift through **down**, inspect the translation and approximate Russian highlight. Click to save, then move away: a playing video resumes; a manually paused one stays paused.
+- [ ] Repeat with **“look forward to”**. Check multi-word translation, fallback highlighting if there is no unambiguous match, and persistence after a reload.
+- [ ] In Dictionary inspect/edit both entries and their sentence, video timestamp/link and note. Open all three external dictionary links and verify searches, including phrases.
+- [ ] Export JSON, then Anki CSV; inspect quotes, multiline text and Cyrillic. Import the CSV into a test Anki deck using the six-field mapping above; check the resulting cards and video links. Test old-extension JSON migration separately before removing the old copy.
+- [ ] Try a changing auto-generated caption, translator outage/rate limit, fast seeking, fullscreen and return to normal. Confirm stale translations don't replace the current line and manual pause is respected.
+
+## Privacy and permissions
+
+Your dictionary and cached translations stay in the browser's extension storage unless you explicitly export them. No account or analytics are added by this fork; no dictionary is uploaded or scraped. Google, Bing or DeepL receive text for translations; with dual mode on, this includes visible full lines, and the provider can observe normal request metadata. DeepL API keys remain in local extension storage. Clicking an external dictionary link sends the expression to that site in your browser. Existing optional host access for Bing/DeepL is requested only when selected; the fork adds no permissions. The inherited uninstall-survey URL is cleared rather than directing fork users to upstream's survey.
+
+## Development and checks
 
 ```bash
-npm test             # the tests of all three packages (Vitest, node:test)
-npm run verify       # lint, types, tests, store listing limits, versions
-npm run test:e2e     # the extension in Playwright's Chromium on local copies of YouTube's player (run npm run build first)
+npm run lint
+npm run typecheck
+npm test                          # scripts + extension + popup unit/integration
+npm run setup:chrome && npm run build
+npx playwright install chromium  # on Linux CI: add --with-deps
+npm run test:e2e                  # installed extension on local mock YouTube + mock translators
+# Optional: content bundle only, with a simulated Chrome API (not extension E2E):
+HT_CHROMIUM_PATH=/path/to/chromium node scripts/browser-smoke.js
 ```
 
-The store screenshots, promo images and video, the GIFs in this README, and the website's videos and link preview (`site/media/`) are made by `npm run render:store` and `npm run render:video` (`store-assets/render/`): the built extension on live YouTube, translated by DeepL (a key in `.env`).
+The existing [CI workflow](.github/workflows/ci.yml) installs Chromium and runs these checks. E2E tests need a **full Chromium** capable of loading MV3 extensions, not Chromium headless shell. In the current sandbox the browser download was blocked and full extension E2E did not run; the production content bundle was separately smoke-tested in headless Chromium with mocked Chrome APIs. Real YouTube, the desktop Anki UI and the new Firefox identity still require manual verification. Tests and fixture outcomes do not guarantee compatibility with future YouTube DOM changes.
 
-`npm ci` in the root also installs the git hooks: a commit is checked in a few seconds (ESLint on the changed files, locale JSON, listing limits, versions), a push runs `npm run verify`. GitHub Actions runs the same on every push and pull request, plus the store packages, `web-ext lint` and the end-to-end tests.
+## License and credits
 
-## Acknowledgements
-
-- [XTranslate](https://github.com/ixrock/XTranslate)
-- [MouseTooltipTranslator](https://github.com/ttop32/MouseTooltipTranslator)
-
-The GIFs and the store images show the open movies [Sprite Fright](https://studio.blender.org/films/sprite-fright/) (© Blender Studio, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)) and [Sintel](https://durian.blender.org/) (© Blender Foundation, [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/)).
+[MIT](LICENSE), Copyright © 2025 Dmytro Kozii. Original source: [kozii-d/hover-translate](https://github.com/kozii-d/hover-translate). This fork adds the features described above and keeps the original license and attribution. The upstream project credits [MouseTooltipTranslator](https://github.com/ttop32/MouseTooltipTranslator), [XTranslate](https://github.com/ixrock/xt) and the open-source translation services; retained thanks. Dependency licenses and notices: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

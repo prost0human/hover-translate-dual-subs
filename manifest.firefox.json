@@ -1,13 +1,13 @@
 {
   "manifest_version": 3,
-  "name": "__MSG_name__",
-  "short_name": "HoverTranslate",
+  "name": "__MSG_forkName__",
+  "short_name": "Dual Subs",
   "version": "1.3.0",
   "default_locale": "en",
   "description": "__MSG_description__",
   "browser_specific_settings": {
     "gecko": {
-      "id": "{C49CC196-68CC-441D-9224-2A05F1A073BF}",
+      "id": "hover-translate-dual-subs@prost0human.github.io",
       "strict_min_version": "115.0"
     }
   },
