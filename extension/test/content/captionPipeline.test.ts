@@ -15,11 +15,16 @@ import { FakeChrome, installFakeChrome } from "../fakeChrome.ts";
 
 class Translator extends BaseTranslator {
   calls: string[] = [];
+  waitFor?: string;
+  finish?: (result: { detectedLanguageCode: string; translatedText: string }) => void;
   get name() { return "Fake"; }
   get key() { return "fake"; }
   async getAvailableLanguages() { return { sourceLanguages: [], targetLanguages: [] }; }
   async translate(text: string) {
     this.calls.push(text);
+    if (text === this.waitFor) {
+      return new Promise<{ detectedLanguageCode: string; translatedText: string }>((resolve) => { this.finish = resolve; });
+    }
     const answers: Record<string, string> = {
       "I didn't expect him to back down": "Я не ожидал, что он отступит.",
       "back down": "отступить", "New caption": "Новая строка",
@@ -73,4 +78,31 @@ it("native caption mutation → dual layer → Shift hover, pause, save context 
   await vi.waitFor(() => expect(document.querySelector(".ht-dual-subtitle")?.textContent).toBe("Новая строка"), { timeout: 3000 });
   expect(segment.querySelectorAll(".custom-tooltip-word")).toHaveLength(2);
   expect(translator.calls.filter((text) => text === "New caption")).toHaveLength(1);
+});
+
+it("keeps a partial translation visible but never saves it as the translation of a longer example", async () => {
+  await vi.waitFor(() => expect(document.querySelector(".ht-dual-subtitle")?.textContent).toBe("Я не ожидал, что он отступит."));
+  const extended = "I didn't expect him to back down. today";
+  translator.waitFor = extended;
+  segment.appendChild(document.createTextNode(" today"));
+  await vi.waitFor(() => expect(segment.querySelectorAll(".custom-tooltip-word")).toHaveLength(8));
+  expect(document.querySelector(".ht-dual-subtitle")?.textContent).toBe("Я не ожидал, что он отступит.");
+  await vi.waitFor(() => expect(translator.finish).toBeDefined(), { timeout: 3000 });
+  const words = Array.from(segment.querySelectorAll<HTMLElement>(".custom-tooltip-word"));
+  const back = words.find((word) => word.textContent?.trim() === "back")!;
+  const down = words.find((word) => word.textContent?.trim() === "down.")!;
+  mouse(caption, "pointerenter");
+  mouse(back, "pointerenter"); mouse(back, "pointerleave", true); mouse(down, "pointerenter", true);
+  await vi.waitFor(() => expect(document.querySelector(".custom-tooltip")?.textContent).toBe("отступить"));
+  mouse(down, "pointerdown"); mouse(down, "pointerup");
+  await vi.waitFor(() => expect((fake.storage.local.savedTranslations as unknown[])?.length).toBe(1));
+  const [saved] = fake.storage.local.savedTranslations as Record<string, unknown>[];
+  expect(saved.exampleOriginal).toBe(extended);
+  expect(saved.exampleTranslation).toBeUndefined();
+
+  caption.style.display = "none";
+  await vi.waitFor(() => expect(document.querySelector(".ht-dual-subtitle")).toBeNull());
+  translator.finish?.({ detectedLanguageCode: "en", translatedText: "Поздний перевод" });
+  await Promise.resolve();
+  expect(document.querySelector(".ht-dual-subtitle")).toBeNull();
 });

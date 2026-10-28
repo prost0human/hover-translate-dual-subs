@@ -2,12 +2,20 @@ import { CAPTION_WINDOW, VIDEO_PLAYER } from "../consts/consts.ts";
 import { TranslationCore } from "../core/translationCore.ts";
 import { getCaptionText, looksLikeEnglishCaption } from "../utils/subtitleText.ts";
 import { alignTranslation } from "../utils/alignTranslation.ts";
+import { isCaptionContinuation, isCaptionPrefix, isTranslationRelevant } from "../utils/captionProgress.ts";
 import { DUAL_SETTINGS_KEY, DualSubtitleSettings, normalizeDualSettings } from "../../common/types/dualSubtitles.ts";
 import { TranslationCacheData } from "../../common/types/translations.ts";
 
-const DEBOUNCE_MS = 350;
+// Start the first fragment promptly, then coalesce updates without waiting for
+// the stream of words to stop. Limit traffic even when captions change rapidly.
+const FIRST_FRAGMENT_DELAY_MS = 120;
+const UPDATE_INTERVAL_MS = 800;
+const CAPACITY_RETRY_MS = 150;
 const ERROR_COOLDOWN_MS = 15_000;
 const MAX_IN_FLIGHT = 2;
+const TOP_INSET_PX = 8;
+const TOP_STACK_GAP_PX = 4;
+const SUBTITLE_LANGUAGES = { sourceLanguageCode: "en", targetLanguageCode: "ru" };
 
 type Selection = { text: string; translation?: string };
 interface CaptionView {
@@ -17,8 +25,15 @@ interface CaptionView {
   resizeObserver?: ResizeObserver;
   text: string;
   translation: string;
+  /** The exact English snapshot used for the translation currently on screen. */
+  translationSource: string;
   selection?: Selection;
   revision: number;
+  generation: number;
+  appliedRevision: number;
+  lastRequestedText: string;
+  lastRequestedRevision: number;
+  lastRequestAt: number | null;
   timeout?: ReturnType<typeof setTimeout>;
 }
 interface Request { controller: AbortController; promise: Promise<TranslationCacheData | null> }
@@ -33,7 +48,7 @@ export class DualSubtitleService {
   private container: Element | null = null;
   private views = new Map<HTMLElement, CaptionView>();
   private requests = new Map<string, Request>();
-  private failures = new Map<string, number>();
+  private retryAfter = 0;
   private destroyed = false;
 
   constructor(private readonly core: TranslationCore, settings?: Partial<DualSubtitleSettings>) {
@@ -65,18 +80,8 @@ export class DualSubtitleService {
         view = this.createView(caption, player);
         this.views.set(caption, view);
       }
-      if (view.text !== text) {
-        view.text = text;
-        view.translation = "";
-        view.revision++;
-        clearTimeout(view.timeout);
-        view.overlay.textContent = "";
-        view.overlay.removeAttribute("data-alignment");
-        const revision = view.revision;
-        view.timeout = setTimeout(() => void this.translate(view!, revision), DEBOUNCE_MS);
-      }
+      if (view.text !== text) this.updateText(view, text);
       this.applyStyle(view);
-      this.position(view);
     }
     for (const [caption, view] of this.views) {
       if (!live.has(caption)) {
@@ -85,6 +90,7 @@ export class DualSubtitleService {
       }
     }
     this.abortObsoleteRequests();
+    this.positionAll();
   }
 
   /** Selection is supplied by HoverTranslate, including Shift-selected phrases. */
@@ -93,6 +99,7 @@ export class DualSubtitleService {
       view.selection = view.window === caption && text ? { text, translation } : undefined;
       this.render(view);
     }
+    this.positionAll();
   }
 
   public clearSelection(): void {
@@ -101,12 +108,16 @@ export class DualSubtitleService {
 
   public getTranslation(caption: HTMLElement | null, source: string): string | undefined {
     const view = caption && this.views.get(caption);
-    return view && view.text === source && view.translation ? view.translation : undefined;
+    // A partial translation must not be saved as the translation of a longer
+    // example sentence that has appeared since the request was made.
+    return view && view.text === source && view.translationSource === source && view.translation
+      ? view.translation : undefined;
   }
 
+  /** Only an overlay above the original needs to make room for the word card. */
   public getOverlay(caption: HTMLElement): HTMLElement | null {
     const view = this.views.get(caption);
-    return view?.overlay.textContent ? view.overlay : null;
+    return this.settings.position === "above" && view?.overlay.textContent ? view.overlay : null;
   }
 
   public destroy(): void {
@@ -126,6 +137,7 @@ export class DualSubtitleService {
     this.settings = normalizeDualSettings(changes[DUAL_SETTINGS_KEY].newValue as Partial<DualSubtitleSettings> | undefined);
     this.sync();
     for (const view of this.views.values()) this.render(view);
+    this.positionAll();
   };
 
   private createView(caption: HTMLElement, player: HTMLElement): CaptionView {
@@ -134,9 +146,13 @@ export class DualSubtitleService {
     overlay.lang = "ru";
     overlay.setAttribute("aria-live", "polite");
     player.appendChild(overlay);
-    const view: CaptionView = { window: caption, player, overlay, text: "", translation: "", revision: 0 };
+    const view: CaptionView = {
+      window: caption, player, overlay, text: "", translation: "", translationSource: "",
+      revision: 0, generation: 0, appliedRevision: 0,
+      lastRequestedText: "", lastRequestedRevision: 0, lastRequestAt: null,
+    };
     if (typeof ResizeObserver !== "undefined") {
-      view.resizeObserver = new ResizeObserver(() => this.position(view));
+      view.resizeObserver = new ResizeObserver(this.positionAll);
       view.resizeObserver.observe(player);
       view.resizeObserver.observe(caption);
     }
@@ -144,76 +160,152 @@ export class DualSubtitleService {
   }
 
   private removeView(view: CaptionView): void {
-    view.revision++;
+    view.generation++;
     clearTimeout(view.timeout);
+    view.timeout = undefined;
     view.resizeObserver?.disconnect();
     view.overlay.remove();
   }
 
+  private updateText(view: CaptionView, text: string): void {
+    const continued = isCaptionContinuation(view.text, text);
+    if (!continued) {
+      // The same DOM window can be reused for an unrelated caption. Nothing
+      // from its previous generation may be rendered or selected in this one.
+      view.generation++;
+      view.selection = undefined;
+      view.lastRequestedText = "";
+      view.lastRequestAt = null;
+      clearTimeout(view.timeout);
+      view.timeout = undefined;
+    }
+    view.text = text;
+    view.revision++;
+    if (view.translation && isTranslationRelevant(view.translationSource, text)) {
+      this.render(view);
+    } else if (view.translation || !continued) {
+      this.clearTranslation(view);
+    }
+    // Do not restart this timer on every word: a live stream may never pause.
+    this.schedule(view);
+  }
+
+  private clearTranslation(view: CaptionView): void {
+    view.translation = "";
+    view.translationSource = "";
+    view.overlay.textContent = "";
+    view.overlay.removeAttribute("data-alignment");
+    view.overlay.removeAttribute("data-status");
+  }
+
+  private schedule(view: CaptionView): void {
+    if (!this.isLive(view)) return;
+    const now = Date.now();
+    if (this.retryAfter > now && !view.translation && view.overlay.dataset.status !== "error") this.showError(view);
+    if (view.timeout !== undefined) return;
+    const nextUpdate = view.lastRequestAt === null ? now + FIRST_FRAGMENT_DELAY_MS : view.lastRequestAt + UPDATE_INTERVAL_MS;
+    const delay = Math.max(0, nextUpdate - now, this.retryAfter - now);
+    view.timeout = setTimeout(() => {
+      view.timeout = undefined;
+      void this.translate(view);
+    }, delay);
+  }
+
   private abortObsoleteRequests(): void {
-    const needed = new Set(Array.from(this.views.values(), (view) => view.text));
     for (const [text, request] of this.requests) {
-      if (needed.has(text)) continue;
+      // A request for a prefix is still useful as a growing line is displayed.
+      // Rolling off that prefix or switching to another line makes it obsolete.
+      const needed = Array.from(this.views.values()).some((view) => isCaptionPrefix(text, view.text));
+      if (needed) continue;
       this.requests.delete(text);
       request.controller.abort();
     }
   }
 
-  private async translate(view: CaptionView, revision: number): Promise<void> {
-    if (!this.isCurrent(view, revision)) return;
-    const text = view.text;
-    if ((this.failures.get(text) ?? 0) > Date.now()) {
-      this.showError(view);
+  private async translate(view: CaptionView): Promise<void> {
+    if (!this.isLive(view) || view.lastRequestedText === view.text) return;
+    if (this.retryAfter > Date.now()) {
+      this.schedule(view);
       return;
     }
+    const text = view.text;
     let request = this.requests.get(text);
     if (!request) {
-      if (this.requests.size >= MAX_IN_FLIGHT) {
-        view.timeout = setTimeout(() => void this.translate(view, revision), DEBOUNCE_MS);
+      if (this.requests.size >= MAX_IN_FLIGHT && !this.core.hasCachedTranslation(text, undefined, SUBTITLE_LANGUAGES)) {
+        view.timeout = setTimeout(() => {
+          view.timeout = undefined;
+          void this.translate(view);
+        }, CAPACITY_RETRY_MS);
         return;
       }
       const controller = new AbortController();
-      const promise = this.core.translateText(text, undefined, controller.signal, { sourceLanguageCode: "en", targetLanguageCode: "ru" });
+      const promise = this.core.translateText(text, undefined, controller.signal, SUBTITLE_LANGUAGES);
       request = { controller, promise };
       this.requests.set(text, request);
     }
+    const revision = view.revision;
+    const generation = view.generation;
+    view.lastRequestedText = text;
+    view.lastRequestedRevision = revision;
+    view.lastRequestAt = Date.now();
     try {
       const result = await request.promise;
-      if (!this.isCurrent(view, revision)) return;
+      if (!this.canApply(view, generation, revision, text) || request.controller.signal.aborted) return;
       if (!result?.translatedText) {
-        if (!request.controller.signal.aborted) this.showError(view);
+        this.failed(view, revision);
         return;
       }
-      this.failures.delete(text);
       view.translation = result.translatedText;
+      view.translationSource = text;
+      view.appliedRevision = revision;
       this.render(view);
-      this.position(view);
+      this.positionAll();
+      if (this.retryAfter > Date.now()) {
+        // Another in-flight request succeeded, so retry pending captions now
+        // rather than making them wait out an obsolete provider cooldown.
+        this.retryAfter = 0;
+        for (const pending of this.views.values()) {
+          clearTimeout(pending.timeout);
+          pending.timeout = undefined;
+          if (pending.lastRequestedText !== pending.text) this.schedule(pending);
+        }
+      }
     } catch (error) {
-      if (!this.isCurrent(view, revision) || request.controller.signal.aborted) return;
+      if (!this.canApply(view, generation, revision, text) || request.controller.signal.aborted) return;
       console.warn("Subtitle translation failed", error);
-      this.failures.set(text, Date.now() + ERROR_COOLDOWN_MS);
-      this.showError(view);
+      this.failed(view, revision);
     } finally {
       if (this.requests.get(text) === request) this.requests.delete(text);
     }
   }
 
-  private isCurrent(view: CaptionView, revision: number): boolean {
-    return !this.destroyed && this.views.get(view.window) === view && view.revision === revision && view.window.isConnected;
+  private failed(view: CaptionView, revision: number): void {
+    this.retryAfter = Date.now() + ERROR_COOLDOWN_MS;
+    // Do not erase a newer request that is already running.
+    if (view.lastRequestedRevision === revision) view.lastRequestedText = "";
+    if (!view.translation) this.showError(view);
+    if (view.lastRequestedText !== view.text) this.schedule(view);
+  }
+
+  private isLive(view: CaptionView): boolean {
+    return !this.destroyed && this.views.get(view.window) === view && view.window.isConnected;
+  }
+
+  private canApply(view: CaptionView, generation: number, revision: number, source: string): boolean {
+    return this.isLive(view) && view.generation === generation && revision >= view.appliedRevision && isCaptionPrefix(source, view.text);
   }
 
   private showError(view: CaptionView): void {
-    view.translation = "";
     view.overlay.textContent = chrome.i18n.getMessage("dualSubtitleError") || "Subtitle translation unavailable";
     view.overlay.setAttribute("data-status", "error");
-    this.position(view);
+    this.positionAll();
   }
 
   private render(view: CaptionView): void {
     if (!view.translation) return;
     const selection = this.settings.crossHighlight ? view.selection : undefined;
     const alignment = selection
-      ? alignTranslation(view.text, view.translation, selection.text, selection.translation)
+      ? alignTranslation(view.translationSource, view.translation, selection.text, selection.translation)
       : { kind: "none" as const, ranges: [] };
     view.overlay.removeAttribute("data-status");
     view.overlay.setAttribute("data-alignment", alignment.kind);
@@ -230,20 +322,27 @@ export class DualSubtitleService {
   }
 
   private applyStyle(view: CaptionView): void {
+    view.overlay.dataset.position = this.settings.position;
     view.overlay.style.fontSize = `${this.settings.fontSize}px`;
     view.overlay.style.color = `rgba(255, 255, 255, ${this.settings.textOpacity / 100})`;
     view.overlay.style.backgroundColor = `rgba(8, 8, 8, ${this.settings.backgroundOpacity / 100})`;
   }
 
   private positionAll = (): void => {
-    for (const view of this.views.values()) this.position(view);
+    const topOffsets = new Map<HTMLElement, number>();
+    for (const view of this.views.values()) {
+      const player = view.player.getBoundingClientRect();
+      view.overlay.style.maxWidth = `${Math.max(0, player.width * 0.9)}px`;
+      if (this.settings.position === "top") {
+        const top = topOffsets.get(view.player) ?? TOP_INSET_PX + this.settings.verticalGap;
+        view.overlay.style.left = `${player.width / 2}px`;
+        view.overlay.style.top = `${top}px`;
+        if (view.overlay.textContent) topOffsets.set(view.player, top + view.overlay.getBoundingClientRect().height + TOP_STACK_GAP_PX);
+      } else {
+        const caption = view.window.getBoundingClientRect();
+        view.overlay.style.left = `${caption.left + caption.width / 2 - player.left}px`;
+        view.overlay.style.top = `${caption.top - player.top - this.settings.verticalGap}px`;
+      }
+    }
   };
-
-  private position(view: CaptionView): void {
-    const caption = view.window.getBoundingClientRect();
-    const player = view.player.getBoundingClientRect();
-    view.overlay.style.left = `${caption.left + caption.width / 2 - player.left}px`;
-    view.overlay.style.top = `${caption.top - player.top - this.settings.verticalGap}px`;
-    view.overlay.style.maxWidth = `${Math.max(0, player.width * 0.9)}px`;
-  }
 }

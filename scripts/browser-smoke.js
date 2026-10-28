@@ -30,6 +30,7 @@ async function main() {
   network.translate("ru", "back down", "отступить");
   network.translate("ru", "I look forward to it", "Я с нетерпением ждал этого");
   network.translate("ru", "look forward to", "с нетерпением жду");
+  network.translate("ru", "We", "Мы");
   const browser = await chromium.launch({
     executablePath: process.env.HT_CHROMIUM_PATH || undefined,
     headless: true,
@@ -142,8 +143,56 @@ async function main() {
     await word("look").hover(); await page.keyboard.down("Shift"); await word("forward").hover(); await word("to").hover(); await page.keyboard.up("Shift");
     await page.waitForFunction(() => document.querySelector(".custom-tooltip")?.textContent === "с нетерпением жду");
     assert.equal(await overlay.locator("mark").textContent(), "с нетерпением ждал");
+
+    await page.evaluate(() => chrome.storage.sync.set({ dualSubtitleSettings: { enabled: true, showRussian: true, crossHighlight: true, position: "top" } }));
+    await page.waitForFunction(() => document.querySelector(".ht-dual-subtitle")?.dataset.position === "top");
+    const atTop = async () => page.evaluate(() => {
+      const ru = document.querySelector(".ht-dual-subtitle").getBoundingClientRect();
+      const player = document.querySelector("#movie_player").getBoundingClientRect();
+      return { top: ru.top - player.top, center: Math.abs(ru.left + ru.width / 2 - (player.left + player.width / 2)) };
+    });
+    assert.deepEqual(await atTop(), { top: 14, center: 0 });
+    await word("look").hover();
+    await page.waitForFunction(() => document.querySelector(".custom-tooltip")?.textContent === "[ru] look");
+    const aboveEnglish = await page.evaluate(() => ({
+      tooltip: document.querySelector(".custom-tooltip").getBoundingClientRect().top,
+      russian: document.querySelector(".ht-dual-subtitle").getBoundingClientRect().bottom,
+    }));
+    assert.ok(aboveEnglish.tooltip > aboveEnglish.russian);
+    await word("look").click();
+    await page.waitForFunction(() => window.__smokeStorage.local.savedTranslations?.length === 2);
+    await page.getByRole("button", { name: "Full screen (f)" }).click();
+    await page.waitForFunction(() => Boolean(document.fullscreenElement));
+    await page.waitForFunction(() => Math.abs(document.querySelector(".ht-dual-subtitle").getBoundingClientRect().left + document.querySelector(".ht-dual-subtitle").getBoundingClientRect().width / 2 - (document.querySelector("#movie_player").getBoundingClientRect().left + document.querySelector("#movie_player").getBoundingClientRect().width / 2)) < 1);
+    assert.deepEqual(await atTop(), { top: 14, center: 0 });
+    await page.evaluate(() => document.exitFullscreen());
+
+    await caption("We");
+    await page.waitForFunction(() => document.querySelector(".ht-dual-subtitle")?.textContent === "Мы");
+    await page.evaluate(() => {
+      const node = document.querySelector(".ht-dual-subtitle");
+      window.__emptyRussianFrames = 0;
+      window.__dualObserver = new MutationObserver(() => { if (!node.textContent) window.__emptyRussianFrames++; });
+      window.__dualObserver.observe(node, { childList: true, characterData: true, subtree: true });
+    });
+    const words = ["are", "learning", "English", "every", "day", "at", "home", "with", "our", "friends"];
+    for (const next of words) {
+      await page.evaluate((value) => window.fixture.appendWord(value), next);
+      await page.waitForTimeout(140);
+    }
+    const full = `We ${words.join(" ")}`;
+    await page.waitForFunction((value) => document.querySelector(".ht-dual-subtitle")?.textContent === `[ru] ${value}`, full);
+    assert.equal(await page.evaluate(() => window.__emptyRussianFrames), 0);
+    const partials = network.to("translate.googleapis.com").filter(({ url }) => url.searchParams.get("q")?.startsWith("We "));
+    assert.ok(partials.length > 1);
+    await page.evaluate(() => window.fixture.appendLine("today together"));
+    await page.waitForFunction((value) => document.querySelector(".ht-dual-subtitle")?.textContent === `[ru] ${value} today together`, full);
+    await page.evaluate(() => window.fixture.rollUp());
+    await page.waitForFunction(() => document.querySelector(".ht-dual-subtitle")?.textContent === "[ru] today together");
+    await page.evaluate(() => { document.querySelector(".caption-window").style.display = "none"; });
+    await overlay.waitFor({ state: "detached" });
     assert.deepEqual(errors, []);
-    console.log("PASS: mock-API browser smoke — placement, both phrases, pause/resume, context save and cache.");
+    console.log("PASS: mock-API browser smoke — phrases, pause/save/cache, top/fullscreen/click, live updates, roll-up and hidden track.");
   } finally {
     await browser.close();
   }

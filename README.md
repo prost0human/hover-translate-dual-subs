@@ -8,12 +8,18 @@ For attribution and migration only, the **original**, unmodified extension's lis
 
 ## What it does
 
-- Keeps YouTube's English captions and existing word hover, Shift multi-word selection, click action, auto-pause, translator choices, appearance controls and local dictionary. When enabled, a non-interactive Russian line appears immediately **above** the native captions.
-- Debounces changing caption lines, reuses a persistent bounded translation cache, coalesces identical in-flight requests and discards/aborts obsolete responses. Subtitle translation uses the selected translator with an explicit `en → ru` pair. Word translations still use the original language settings.
+- Keeps YouTube's English captions and existing word hover, Shift multi-word selection, click action, auto-pause, translator choices, appearance controls and local dictionary. The non-interactive Russian line can be placed **above the captions** or at the **top of the video**.
+- Translates growing automatic captions in throttled fragments, keeps a relevant previous translation visible while the next one loads, reuses the bounded cache and discards obsolete replies. Subtitle translation uses the selected translator with an explicit `en → ru` pair. Word translations still use the original language settings.
 - Highlights a Russian translation on English hover/selection **approximately**: a unique literal or conservative inflection match for the selected text's translation is used; otherwise the entire Russian sentence is highlighted. It is not a word-alignment model, and even a literal match can be linguistically wrong. No unsupported positional equivalence is asserted.
 - Saves the selected word/phrase with available source sentence, Russian sentence, video title, timestamped YouTube link and a user note. Old dictionary records remain readable; edit text, examples and notes in Dictionary. Repeated identical entries are merged without replacing an existing note or context.
 - Opens Cambridge English–Russian, Reverso Context and Multitran **links** for a saved expression; no dictionary scraping. Export an Anki CSV or the existing JSON/CSV formats, and import a JSON backup from the original extension.
 - Has English and Russian UI strings; newly added strings in other supported languages fall back to English. No account or paid API is required for the default Google translator. DeepL requires your own key; Bing and DeepL request their existing optional permissions.
+
+## Install or update from the archive
+
+Download the **Chromium production ZIP** from the fork's [Releases](https://github.com/prost0human/hover-translate-dual-subs/releases), not GitHub's source-code ZIP. Extract it, open `chrome://extensions` (or the equivalent in Edge/Brave), enable Developer mode, select **Load unpacked**, and choose the extracted folder containing `manifest.json`.
+
+To update an existing unpacked copy, first export a JSON backup of the dictionary. Extract the new ZIP to a temporary folder and copy its contents over the **same installed folder**; replace existing files, keep the folder path unchanged, click **Reload** on the extension page, then reload YouTube. Changing the installed folder can create a new extension ID with separate storage. The extension does not automatically migrate data between IDs.
 
 ## Install from source (Chrome, Edge, Brave)
 
@@ -44,11 +50,11 @@ The importer accepts the original formatted JSON array and this fork's JSON expo
 ## Use on YouTube
 
 1. Open a video, turn on **CC**, and select an **English** subtitle track in the player. The feature reads visible caption DOM, not YouTube's transcript API. It uses a script heuristic, not reliable language detection; manually select English.
-2. Extension → **Settings**: set **Translate to → Russian** for word/phrase lookups. Enable **Dual subtitles (English → Russian)**. Switch the Russian line and cross-highlight independently; adjust font size, opacity, background and vertical gap. Enable **Auto pause** if desired.
+2. Extension → **Settings**: set **Translate to → Russian** for word/phrase lookups. Enable **Dual subtitles (English → Russian)**. Under **Russian subtitle position**, choose **Above the English captions** or **Top of the video**; adjust font size, opacity, background and distance. The Russian line and cross-highlight can be switched independently. Enable **Auto pause** if desired.
 3. Hover a word. Hold **Shift** and move across adjacent English words to select a phrase (or use the existing always-multiple-selection option). The Russian overlay doesn't intercept pointer events. With the default click action, click the selection to save it. Move the pointer away to resume **only** a video the extension itself paused; a video already paused by you is not resumed. Pressing pause while the extension has already paused the video is not always distinguishable from no action.
 4. In **Dictionary**, expand/edit a record to inspect or correct the word, translation, examples and note. Use its video link or external-dictionary menu. If the sentence translation wasn't ready when you saved, its field may be empty; you can edit it.
 
-Automatic captions update frequently and may flicker or overlap the overlay while changing; some layouts/fullscreen/embedded players, drag behavior, live captions or YouTube DOM changes may need adjustment. A translator can fail, rate-limit, change wording or return a poor translation. Dual lines send **whole visible caption lines** to the selected provider, in addition to any hovered selections; disable the feature to stop those full-line requests. See Privacy below.
+Automatic captions are translated progressively rather than word-for-word: the first fragment is requested shortly after it appears, and growing lines are updated at most about once every 0.8 seconds per caption window. Network and translator latency mean the Russian may lag or change wording; while a line rolls up, the previous overlapping translation may remain briefly. It is removed when its English disappears or the line changes to an unrelated one. Some layouts, live/embedded players or YouTube DOM changes may need adjustment. A translator can fail or rate-limit. **Visible fragments and lines are sent to the selected provider**, in addition to hovered selections; progressive mode can use more requests and paid API quota than waiting for a complete line. Disable dual subtitles to stop these requests. See Privacy below.
 
 ## Export to Anki
 
@@ -62,7 +68,7 @@ A sample produced by the exporter was imported into an isolated collection using
 
 Run on a real Chromium-based browser with a real English-captioned YouTube video; this is not a substitute for automated fixtures:
 
-- [ ] In Settings select Russian, enable dual subtitles and auto-pause; turn on English CC. Confirm Russian above English, readability, seek/resize/fullscreen and no duplicate Russian line after switching videos. Try disabling each new toggle and re-enabling it; native hover/Shift must still work.
+- [ ] In Settings select Russian, enable dual subtitles and auto-pause; turn on English CC. Try both Russian positions, resize/fullscreen, seek and switch videos; confirm readability, interactive English and no duplicate Russian line. Try disabling each new toggle and re-enabling it; native hover/Shift must still work.
 - [ ] Find or create a caption containing **“back down”**. Hover **back**, hold Shift through **down**, inspect the translation and approximate Russian highlight. Click to save, then move away: a playing video resumes; a manually paused one stays paused.
 - [ ] Repeat with **“look forward to”**. Check multi-word translation, fallback highlighting if there is no unambiguous match, and persistence after a reload.
 - [ ] In Dictionary inspect/edit both entries and their sentence, video timestamp/link and note. Open all three external dictionary links and verify searches, including phrases.

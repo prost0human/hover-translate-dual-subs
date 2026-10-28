@@ -67,7 +67,7 @@
     cursor: pointer;
 }
 
-/* Russian is a non-interactive sibling above YouTube's own English captions. */
+/* Russian is a non-interactive sibling of YouTube's own captions. */
 .ht-dual-subtitle {
     position: absolute;
     transform: translate(-50%, -100%);
@@ -84,6 +84,7 @@
     pointer-events: none;
     text-shadow: 0 1px 2px #000;
 }
+.ht-dual-subtitle[data-position="top"] { transform: translate(-50%, 0); }
 .ht-dual-subtitle:empty { display: none; }
 .ht-dual-subtitle mark { color: inherit; background: rgba(255, 191, 0, .55); border-radius: 2px; }
 .ht-dual-subtitle[data-alignment="sentence"] mark { background: rgba(255, 191, 0, .28); }

@@ -69,4 +69,26 @@ describe("Anki, backup and external dictionaries", () => {
     expect(await screen.findByRole("switch", { name: "Cross-highlight translation" })).toBeTruthy();
     expect(fake.storage.sync.settings).toBeUndefined();
   });
+  it("defaults old settings to above, saves the top position, and restores it when settings reopen", async () => {
+    const { fake, user, unmount } = await renderPopup({ sync: { dualSubtitleSettings: { enabled: true, showRussian: true } } });
+    const position = await screen.findByRole("combobox", { name: "Russian subtitle position" });
+    expect(position.textContent).toBe("Above the English captions");
+    await user.click(position);
+    await user.click(await screen.findByRole("option", { name: "Top of the video" }));
+    await waitFor(() => expect(fake.storage.sync.dualSubtitleSettings).toMatchObject({ enabled: true, position: "top" }));
+    expect(screen.getByText(/Distance from the top/)).toBeTruthy();
+    const saved = fake.storage.sync.dualSubtitleSettings;
+    unmount();
+    await renderPopup({ sync: { dualSubtitleSettings: saved } });
+    expect((await screen.findByRole("combobox", { name: "Russian subtitle position" })).textContent).toBe("Top of the video");
+  });
+  it("shows and saves the position choices in Russian", async () => {
+    const { fake, user } = await renderPopup({ language: "ru", sync: { dualSubtitleSettings: { enabled: true, position: "top" } } });
+    const position = await screen.findByRole("combobox", { name: "Расположение русского текста" });
+    expect(position.textContent).toBe("Вверху видеоплеера");
+    expect(screen.getByText(/Расстояние от верха/)).toBeTruthy();
+    await user.click(position);
+    await user.click(await screen.findByRole("option", { name: "Над английскими субтитрами" }));
+    await waitFor(() => expect(fake.storage.sync.dualSubtitleSettings).toMatchObject({ position: "above" }));
+  });
 });

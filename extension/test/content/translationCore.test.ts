@@ -421,6 +421,22 @@ describe("what the translator returns or throws", () => {
     expect(core.hasCachedTranslation("run")).toBe(false);
   });
 
+  it("does not cache a late response from a provider that ignores cancellation", async () => {
+    const translator = new RecordingTranslator();
+    let finish!: (value: TranslatedData) => void;
+    const translate = vi.spyOn(translator, "translate").mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    const core = await createCore(translator);
+    const controller = new AbortController();
+    const pending = core.translateText("run", undefined, controller.signal);
+    controller.abort();
+    finish({ detectedLanguageCode: "en", translatedText: "obsolete" });
+    expect(await pending).toBeNull();
+    expect(core.hasCachedTranslation("run")).toBe(false);
+    expect((await core.translateText("run"))?.translatedText).toBe("«run»");
+    expect(await core.translateText("run", undefined, controller.signal)).toBeNull();
+    expect(translate).toHaveBeenCalledTimes(2);
+  });
+
   it("any other failure reaches the caller and is not cached", async () => {
     const core = await createCore(new RecordingTranslator(false, new Error("Google answered 429")));
 

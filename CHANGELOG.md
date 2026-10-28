@@ -2,8 +2,9 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased] — independent Dual Subs fork
+## [1.4.0] - 2026-10-29 — independent Dual Subs fork
 
+- Fixed automatic captions that kept growing without being translated: progressive updates retain relevant previous fragments, reject stale replies and keep partial translations out of full dictionary examples. Added an optional top-of-video position, including stacked caption windows and fullscreen support.
 - Added opt-in English–Russian dual captions with deduplicated cached translation, approximate cross-highlighting and stale-response protection while retaining hover/Shift and auto-pause.
 - Extended the local dictionary with optional sentence, video/time and note fields; editing, external dictionary links, Anki CSV and JSON backup import were added without replacing legacy entries.
 - Gave the fork distinct Chromium/Firefox identities, marked it as independent, and stopped opening the upstream uninstall survey. Storage is isolated across IDs; see migration instructions. Firefox is not verified for this fork.

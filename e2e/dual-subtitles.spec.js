@@ -81,3 +81,76 @@ test("a video paused by the viewer is not resumed when the pointer leaves", asyn
   await player.moveAway();
   expect(await player.isPaused()).toBe(true);
 });
+
+test("automatic captions are translated while words keep arriving, survive roll-up and vanish with the track", async ({ openPlayer, network }) => {
+  network.translate("ru", "We", "Мы");
+  const player = await openPlayer();
+  await player.captions("We");
+  const overlay = player.frame.locator(".ht-dual-subtitle");
+  await expect(overlay).toHaveText("Мы");
+  await player.frame.evaluate(() => {
+    const node = document.querySelector(".ht-dual-subtitle");
+    window.emptyRussianFrames = 0;
+    window.dualObserver = new MutationObserver(() => { if (!node.textContent) window.emptyRussianFrames++; });
+    window.dualObserver.observe(node, { childList: true, characterData: true, subtree: true });
+  });
+  const words = ["are", "learning", "English", "every", "day", "at", "home", "with", "our", "friends"];
+  for (const word of words) {
+    await player.fixture("appendWord", word);
+    await player.page.waitForTimeout(140);
+  }
+  const full = `We ${words.join(" ")}`;
+  await expect(overlay).toHaveText(`[ru] ${full}`);
+  const requested = network.to("translate.googleapis.com").map(({ url }) => url.searchParams.get("q"));
+  expect(requested.filter((text) => text?.startsWith("We ")).length).toBeGreaterThan(1);
+  expect(await player.frame.evaluate(() => window.emptyRussianFrames)).toBe(0);
+
+  await player.fixture("appendLine", "today together");
+  await expect(overlay).toHaveText(`[ru] ${full} today together`);
+  await player.fixture("rollUp");
+  await expect(player.word("today")).toBeVisible();
+  await expect(overlay).not.toBeEmpty();
+  await expect(overlay).toHaveText("[ru] today together");
+  await player.fixture("captions", []);
+  await expect(overlay).toHaveCount(0);
+});
+
+test("top position follows the player, survives full screen, stacks windows and leaves English clickable", async ({ openPlayer, storage }) => {
+  await storage.set("sync", { dualSubtitleSettings: { enabled: true, showRussian: true, crossHighlight: true, position: "top" } });
+  const player = await openPlayer();
+  await player.captions([{ lines: [original] }, { lines: ["Another speaker"], position: "top" }]);
+  const overlays = player.frame.locator(".ht-dual-subtitle");
+  await expect(overlays).toHaveCount(2);
+  await expect(overlays.first()).toHaveText(translated);
+  await expect(overlays.nth(1)).toHaveText("[ru] Another speaker");
+  const playerBox = () => player.frame.locator("#movie_player").boundingBox();
+  const centeredAtTop = async () => {
+    const box = await playerBox();
+    const ru = await overlays.first().boundingBox();
+    return { offset: ru.y - box.y, centerError: Math.abs(ru.x + ru.width / 2 - (box.x + box.width / 2)) };
+  };
+  await expect.poll(async () => (await centeredAtTop()).offset).toBeCloseTo(14, 0);
+  expect((await centeredAtTop()).centerError).toBeLessThan(1);
+  const first = await overlays.first().boundingBox();
+  const second = await overlays.nth(1).boundingBox();
+  expect(second.y).toBeGreaterThanOrEqual(first.y + first.height);
+  expect(await overlays.first().evaluate((node) => getComputedStyle(node).pointerEvents)).toBe("none");
+
+  await player.word("back").hover();
+  await expect(player.tooltip).toHaveText("[ru] back");
+  const tooltip = await player.tooltip.boundingBox();
+  const english = await player.frame.locator(".caption-window").first().boundingBox();
+  expect(tooltip.y).toBeGreaterThan(first.y + first.height);
+  expect(tooltip.y + tooltip.height).toBeLessThan(english.y);
+  await player.word("back").click();
+  await expect.poll(async () => (await storage.get("local", "savedTranslations"))?.[0]?.originalText).toBe("back");
+
+  await player.frame.evaluate(() => { document.querySelector("#player-container").style.width = "640px"; });
+  await expect.poll(async () => (await centeredAtTop()).centerError).toBeLessThan(1);
+  await player.frame.evaluate(() => { document.querySelector("#player-container").style.width = ""; });
+  await player.frame.getByRole("button", { name: "Full screen (f)" }).click();
+  await expect.poll(() => player.frame.evaluate(() => Boolean(document.fullscreenElement))).toBe(true);
+  await expect.poll(async () => (await centeredAtTop()).centerError).toBeLessThan(1);
+  await expect.poll(async () => (await centeredAtTop()).offset).toBeCloseTo(14, 0);
+  expect((await storage.get("sync", "dualSubtitleSettings")).position).toBe("top");
+});
