@@ -257,11 +257,11 @@ export class TranslationCore {
    * exists to avoid firing requests while the pointer sweeps across a line, and
    * a cache hit fires none.
    */
-  public hasCachedTranslation(text: string, context?: string): boolean {
+  public hasCachedTranslation(text: string, context?: string, languages?: { sourceLanguageCode: string; targetLanguageCode: string }): boolean {
     const normalizedText = trimEdgePunctuation(text);
     if (!normalizedText) return false;
 
-    const cacheKey = this.getCacheKey(normalizedText, this.getEffectiveContext(text, context));
+    const cacheKey = this.getCacheKey(normalizedText, this.getEffectiveContext(text, context), languages);
 
     return this.translationCache.has(cacheKey);
   }
@@ -278,7 +278,7 @@ export class TranslationCore {
     // selection itself.
     const normalizedText = trimEdgePunctuation(text);
 
-    if (!normalizedText) {
+    if (!normalizedText || signal?.aborted) {
       return null;
     }
 
@@ -302,7 +302,9 @@ export class TranslationCore {
         effectiveContext,
       );
 
-      if (!translatedData) {
+      // Some providers (or the background worker) may still answer after the
+      // caller cancelled. Never let that obsolete reply overwrite the cache.
+      if (!translatedData?.translatedText?.trim() || signal?.aborted) {
         return null;
       }
 
