@@ -146,6 +146,38 @@ async function main() {
 
     await page.evaluate(() => chrome.storage.sync.set({ dualSubtitleSettings: { enabled: true, showRussian: true, crossHighlight: true, position: "top" } }));
     await page.waitForFunction(() => document.querySelector(".ht-dual-subtitle")?.dataset.position === "top");
+    const metrics = () => page.evaluate(() => {
+      const overlay = document.querySelector(".ht-dual-subtitle");
+      const content = overlay.querySelector(".ht-dual-subtitle-content");
+      const native = document.querySelector(".caption-window .ytp-caption-segment");
+      const walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT);
+      let first = walker.nextNode();
+      while (first && !first.textContent.trim()) first = walker.nextNode();
+      if (!first) throw new Error("Russian text has no visible character");
+      const start = first.textContent.search(/\S/);
+      const range = document.createRange();
+      range.setStart(first, start); range.setEnd(first, start + 1);
+      return {
+        left: range.getBoundingClientRect().left,
+        textAlign: getComputedStyle(overlay).textAlign,
+        russianSize: getComputedStyle(overlay).fontSize,
+        nativeSize: getComputedStyle(native).fontSize,
+        russianFamily: getComputedStyle(overlay).fontFamily,
+        nativeFamily: getComputedStyle(native).fontFamily,
+        frameBackground: getComputedStyle(overlay).backgroundColor,
+        textBackground: getComputedStyle(content).backgroundColor,
+      };
+    });
+    let appearance = await metrics();
+    assert.equal(appearance.textAlign, "left");
+    assert.equal(appearance.russianSize, appearance.nativeSize);
+    assert.equal(appearance.russianFamily, appearance.nativeFamily);
+    assert.equal(appearance.frameBackground, "rgba(0, 0, 0, 0)");
+    assert.equal(appearance.textBackground, "rgba(8, 8, 8, 0.75)");
+    await page.evaluate(() => { document.querySelector(".ytp-caption-segment").style.fontSize = "32px"; });
+    await page.waitForFunction(() => getComputedStyle(document.querySelector(".ht-dual-subtitle")).fontSize === "32px");
+    await page.evaluate(() => { document.querySelector(".ytp-caption-segment").style.fontSize = "22px"; });
+    await page.waitForFunction(() => getComputedStyle(document.querySelector(".ht-dual-subtitle")).fontSize === "22px");
     const atTop = async () => page.evaluate(() => {
       const ru = document.querySelector(".ht-dual-subtitle").getBoundingClientRect();
       const player = document.querySelector("#movie_player").getBoundingClientRect();
@@ -169,6 +201,8 @@ async function main() {
 
     await caption("We");
     await page.waitForFunction(() => document.querySelector(".ht-dual-subtitle")?.textContent === "Мы");
+    appearance = await metrics();
+    const startingLeft = appearance.left;
     await page.evaluate(() => {
       const node = document.querySelector(".ht-dual-subtitle");
       window.__emptyRussianFrames = 0;
@@ -182,6 +216,7 @@ async function main() {
     }
     const full = `We ${words.join(" ")}`;
     await page.waitForFunction((value) => document.querySelector(".ht-dual-subtitle")?.textContent === `[ru] ${value}`, full);
+    assert.ok(Math.abs((await metrics()).left - startingLeft) < 0.5);
     assert.equal(await page.evaluate(() => window.__emptyRussianFrames), 0);
     const partials = network.to("translate.googleapis.com").filter(({ url }) => url.searchParams.get("q")?.startsWith("We "));
     assert.ok(partials.length > 1);
@@ -189,10 +224,51 @@ async function main() {
     await page.waitForFunction((value) => document.querySelector(".ht-dual-subtitle")?.textContent === `[ru] ${value} today together`, full);
     await page.evaluate(() => window.fixture.rollUp());
     await page.waitForFunction(() => document.querySelector(".ht-dual-subtitle")?.textContent === "[ru] today together");
+    const beforeCorrection = await metrics();
+    await page.evaluate(() => { document.querySelector(".ytp-caption-segment").textContent = "Today we practice"; });
+    await page.waitForFunction(() => document.querySelector(".ht-dual-subtitle")?.textContent === "[ru] Today we practice");
+    assert.ok(Math.abs((await metrics()).left - beforeCorrection.left) < 0.5);
     await page.evaluate(() => { document.querySelector(".caption-window").style.display = "none"; });
     await overlay.waitFor({ state: "detached" });
+
+    await page.evaluate(() => chrome.storage.sync.set({ dualSubtitleSettings: { enabled: true, position: "above" } }));
+    await page.evaluate((value) => { window.fixture.dragOn("mousemove"); window.fixture.captions(value); }, original);
+    await page.waitForFunction((value) => document.querySelector(".ht-dual-subtitle")?.textContent === value, translated);
+    const captionBox = () => page.locator(".caption-window").boundingBox();
+    const beforeRu = await overlay.boundingBox();
+    const beforeEn = await captionBox();
+    const dragWord = await word("back").boundingBox();
+    const x = dragWord.x + dragWord.width / 2, y = dragWord.y + dragWord.height / 2;
+    await page.mouse.move(x, y); await page.mouse.down();
+    await page.mouse.move(x - 100, y - 70, { steps: 8 }); await page.mouse.up();
+    const afterRu = await overlay.boundingBox();
+    const afterEn = await captionBox();
+    assert.ok(Math.abs((afterRu.x - beforeRu.x) - (afterEn.x - beforeEn.x)) < 1);
+    assert.ok(Math.abs((afterRu.y - beforeRu.y) - (afterEn.y - beforeEn.y)) < 1);
+    await page.evaluate(() => window.fixture.appendWord("today"));
+    await page.waitForFunction((value) => document.querySelector(".ht-dual-subtitle")?.textContent === `[ru] ${value} today`, original);
+    assert.ok(Math.abs((await metrics()).left - afterRu.x) < 0.5);
+
+    await page.evaluate(() => {
+      window.fixture.captions([{ lines: ["We"], style: "text-align: left; left: 15%; width: max-content; margin-left: 0px;" }]);
+      document.querySelector(".caption-window").dataset.dragged = "true";
+    });
+    await page.waitForFunction(() => document.querySelector(".ht-dual-subtitle")?.textContent === "Мы");
+    const leftAligned = await metrics();
+    const nativeLeft = () => page.locator(".ytp-caption-segment").first().evaluate((node) => node.getBoundingClientRect().left);
+    assert.ok(Math.abs(leftAligned.left - await nativeLeft()) < 1);
+    for (const next of ["are", "learning", "English", "together"]) {
+      await page.evaluate((value) => window.fixture.appendWord(value), next);
+      await page.waitForTimeout(160);
+    }
+    await page.waitForFunction(() => document.querySelector(".ht-dual-subtitle")?.textContent === "[ru] We are learning English together");
+    assert.ok(Math.abs((await metrics()).left - leftAligned.left) < 0.5);
+    assert.ok(Math.abs((await metrics()).left - await nativeLeft()) < 1);
+    const englishRows = await page.locator(".ytp-caption-segment .custom-tooltip-word")
+      .evaluateAll((nodes) => nodes.map((node) => Math.round(node.getBoundingClientRect().top)));
+    assert.equal(new Set(englishRows).size, 1);
     assert.deepEqual(errors, []);
-    console.log("PASS: mock-API browser smoke — phrases, pause/save/cache, top/fullscreen/click, live updates, roll-up and hidden track.");
+    console.log("PASS: mock-API browser smoke — stable left alignment/font size, live subtitles, phrases, pause/save/cache, fullscreen, roll-up and hidden track.");
   } finally {
     await browser.close();
   }

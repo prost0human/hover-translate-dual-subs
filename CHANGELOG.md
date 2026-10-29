@@ -2,13 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.1] - 2026-10-29 — subtitle alignment
+
+- Left-aligned the Russian text in a stable-width frame, so its first character stays in place while captions grow or are revised; kept both above-English and top-of-player modes. The frame still follows intentional caption dragging and player changes.
+- Matched the Russian font size and family to the visible YouTube captions by default, including fullscreen and caption-style changes. The previous custom size remains available by turning matching off.
+- Fixed progressive left-aligned native captions being measured at the extension's previously narrowed hit-area width, which could otherwise wrap them prematurely while words arrived.
+- Added layout, drag, font-matching and migration tests; production smoke and installed-extension E2E use mock YouTube/translator fixtures. Real YouTube still needs a manual check.
+
 ## [1.4.0] - 2026-10-29 — independent Dual Subs fork
 
 - Fixed automatic captions that kept growing without being translated: progressive updates retain relevant previous fragments, reject stale replies and keep partial translations out of full dictionary examples. Added an optional top-of-video position, including stacked caption windows and fullscreen support.
 - Added opt-in English–Russian dual captions with deduplicated cached translation, approximate cross-highlighting and stale-response protection while retaining hover/Shift and auto-pause.
 - Extended the local dictionary with optional sentence, video/time and note fields; editing, external dictionary links, Anki CSV and JSON backup import were added without replacing legacy entries.
 - Gave the fork distinct Chromium/Firefox identities, marked it as independent, and stopped opening the upstream uninstall survey. Storage is isolated across IDs; see migration instructions. Firefox is not verified for this fork.
-- Added focused unit, DOM integration and Playwright mock-player scenarios, and English/Russian fork documentation. A sample CSV was imported with the Anki engine; real YouTube, the Anki desktop UI and full extension E2E still require manual verification.
+- Added focused unit, DOM integration and Playwright mock-player scenarios, and English/Russian fork documentation. A sample CSV was imported with the Anki engine; real YouTube and the Anki desktop UI still require manual verification.
 
 ## [1.3.0] - 2026-10-22
 

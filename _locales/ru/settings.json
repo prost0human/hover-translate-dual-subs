@@ -162,6 +162,7 @@
     "positionAbove": "Над английскими субтитрами",
     "positionTop": "Вверху видеоплеера",
     "topOffset": "Расстояние от верха",
+    "matchYouTubeFontSize": "Размер как у субтитров YouTube",
     "fontSize": "Размер русского текста",
     "textOpacity": "Непрозрачность текста",
     "backgroundOpacity": "Непрозрачность фона",

@@ -54,7 +54,7 @@ export const DualSubtitleSettingsForm: FC = () => {
         .then((value) => setSettings(normalizeDualSettings(value))).catch(() => {});
     }
   };
-  const toggle = (key: "enabled" | "showRussian" | "crossHighlight", value: boolean) => {
+  const toggle = (key: "enabled" | "showRussian" | "crossHighlight" | "matchYouTubeFontSize", value: boolean) => {
     const next = { ...settings, [key]: value };
     setSettings(next);
     void persist(next);
@@ -98,7 +98,13 @@ export const DualSubtitleSettingsForm: FC = () => {
             <MenuItem value="top">{t("dual.positionTop")}</MenuItem>
           </Select>
         </FormControl>
-        {slider("fontSize", 12, 48, 1, "px")}
+        <FormControlLabel
+          control={<Switch checked={settings.matchYouTubeFontSize} onChange={(_, value) => toggle("matchYouTubeFontSize", value)}/>}
+          label={t("dual.matchYouTubeFontSize")}
+        />
+        <Collapse in={!settings.matchYouTubeFontSize} unmountOnExit>
+          {slider("fontSize", 12, 48, 1, "px")}
+        </Collapse>
         {slider("textOpacity", 25, 100, 5, "%")}
         {slider("backgroundOpacity", 0, 100, 5, "%")}
         {slider("verticalGap", 0, 80, 2, "px")}

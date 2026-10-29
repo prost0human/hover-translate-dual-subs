@@ -5,6 +5,10 @@ import { CaptionWord, renderWord, splitIntoWords } from "../utils/wordSegmenter.
 import { isShiftHeld } from "../utils/shiftKey.ts";
 import { findVisibleCaptionSegment } from "../utils/domUtils.ts";
 
+// The width YouTube chose before the extension narrowed the hit area. Kept
+// per DOM window across pipeline rebuilds; WeakMap entries vanish with it.
+const captionWidths = new WeakMap<HTMLElement, { native: string; applied: string }>();
+
 export class SubtitleCore {
   /**
    * Words this instance last split each caption line into. It is what makes an
@@ -259,11 +263,21 @@ export class SubtitleCore {
    */
   public updateCaptionWindowSize(): void {
     document.querySelectorAll(`.${CAPTION_WINDOW}`).forEach((captionWindow) => {
+      if (!(captionWindow instanceof HTMLElement)) return;
+      const previous = captionWidths.get(captionWindow);
+      // The hit area is narrowed to the visible text, so hovering an empty
+      // part of YouTube's window does not pause the video. Measure at the
+      // original width first: otherwise a live caption growing inside our
+      // previous, shorter width would wrap a word at a time and never widen.
+      // If YouTube changed the inline width since our last write, it owns the
+      // new width and it becomes the basis of subsequent measurements.
+      const native = previous && captionWindow.style.width === previous.applied ? previous.native : captionWindow.style.width;
+      if (captionWindow.style.width !== native) captionWindow.style.width = native;
       const width = Math.max(0, ...Array.from(captionWindow.querySelectorAll(`.${CAPTION_SEGMENT}`))
         .map((segment) => segment.getBoundingClientRect().width));
-      if (captionWindow instanceof HTMLElement && width > 0 && captionWindow.style.width !== `${width}px`) {
-        captionWindow.style.width = `${width}px`;
-      }
+      const applied = width > 0 ? `${width}px` : native;
+      if (captionWindow.style.width !== applied) captionWindow.style.width = applied;
+      captionWidths.set(captionWindow, { native, applied: captionWindow.style.width });
     });
   }
 

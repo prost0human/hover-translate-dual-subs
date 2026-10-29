@@ -162,6 +162,7 @@
     "positionAbove": "Above the English captions",
     "positionTop": "Top of the video",
     "topOffset": "Distance from the top",
+    "matchYouTubeFontSize": "Match YouTube subtitle size",
     "fontSize": "Russian text size",
     "textOpacity": "Text opacity",
     "backgroundOpacity": "Background opacity",

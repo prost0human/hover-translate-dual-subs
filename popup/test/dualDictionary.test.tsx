@@ -82,11 +82,23 @@ describe("Anki, backup and external dictionaries", () => {
     await renderPopup({ sync: { dualSubtitleSettings: saved } });
     expect((await screen.findByRole("combobox", { name: "Russian subtitle position" })).textContent).toBe("Top of the video");
   });
+  it("matches YouTube's size by default while retaining an older custom size as an option", async () => {
+    const { fake, user } = await renderPopup({ sync: { dualSubtitleSettings: { enabled: true, fontSize: 30 } } });
+    const match = await screen.findByRole("switch", { name: "Match YouTube subtitle size" }) as HTMLInputElement;
+    expect(match.checked).toBe(true);
+    expect(screen.queryByText(/Russian text size:/)).toBeNull();
+    await user.click(match);
+    await waitFor(() => expect(fake.storage.sync.dualSubtitleSettings).toMatchObject({ matchYouTubeFontSize: false, fontSize: 30 }));
+    expect(await screen.findByText("Russian text size: 30px")).toBeTruthy();
+    await user.click(match);
+    await waitFor(() => expect(fake.storage.sync.dualSubtitleSettings).toMatchObject({ matchYouTubeFontSize: true, fontSize: 30 }));
+  });
   it("shows and saves the position choices in Russian", async () => {
     const { fake, user } = await renderPopup({ language: "ru", sync: { dualSubtitleSettings: { enabled: true, position: "top" } } });
     const position = await screen.findByRole("combobox", { name: "Расположение русского текста" });
     expect(position.textContent).toBe("Вверху видеоплеера");
     expect(screen.getByText(/Расстояние от верха/)).toBeTruthy();
+    expect((screen.getByRole("switch", { name: "Размер как у субтитров YouTube" }) as HTMLInputElement).checked).toBe(true);
     await user.click(position);
     await user.click(await screen.findByRole("option", { name: "Над английскими субтитрами" }));
     await waitFor(() => expect(fake.storage.sync.dualSubtitleSettings).toMatchObject({ position: "above" }));

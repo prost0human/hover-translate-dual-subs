@@ -4,6 +4,7 @@ export interface DualSubtitleSettings {
   showRussian: boolean;
   crossHighlight: boolean;
   position: "above" | "top";
+  matchYouTubeFontSize: boolean;
   fontSize: number;
   textOpacity: number;
   backgroundOpacity: number;
@@ -17,6 +18,7 @@ export const defaultDualSubtitleSettings: DualSubtitleSettings = {
   showRussian: true,
   crossHighlight: true,
   position: "above",
+  matchYouTubeFontSize: true,
   fontSize: 22,
   textOpacity: 100,
   backgroundOpacity: 75,
@@ -33,6 +35,7 @@ export function normalizeDualSettings(value: Partial<DualSubtitleSettings> | nul
     showRussian: flag(value?.showRussian, true),
     crossHighlight: flag(value?.crossHighlight, true),
     position: value?.position === "top" ? "top" : "above",
+    matchYouTubeFontSize: flag(value?.matchYouTubeFontSize, true),
     fontSize: bounded(value?.fontSize, 22, 12, 48),
     textOpacity: bounded(value?.textOpacity, 100, 25, 100),
     backgroundOpacity: bounded(value?.backgroundOpacity, 75, 0, 100),

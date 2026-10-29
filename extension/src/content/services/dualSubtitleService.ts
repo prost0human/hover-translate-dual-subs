@@ -1,6 +1,7 @@
 import { CAPTION_WINDOW, VIDEO_PLAYER } from "../consts/consts.ts";
 import { TranslationCore } from "../core/translationCore.ts";
 import { getCaptionText, looksLikeEnglishCaption } from "../utils/subtitleText.ts";
+import { findVisibleCaptionSegment } from "../utils/domUtils.ts";
 import { alignTranslation } from "../utils/alignTranslation.ts";
 import { isCaptionContinuation, isCaptionPrefix, isTranslationRelevant } from "../utils/captionProgress.ts";
 import { DUAL_SETTINGS_KEY, DualSubtitleSettings, normalizeDualSettings } from "../../common/types/dualSubtitles.ts";
@@ -22,6 +23,7 @@ interface CaptionView {
   window: HTMLElement;
   player: HTMLElement;
   overlay: HTMLDivElement;
+  content: HTMLSpanElement;
   resizeObserver?: ResizeObserver;
   text: string;
   translation: string;
@@ -35,6 +37,8 @@ interface CaptionView {
   lastRequestedRevision: number;
   lastRequestAt: number | null;
   timeout?: ReturnType<typeof setTimeout>;
+  /** Width when a centered caption first acquires a left-based drag anchor. */
+  unmarginedCenterWidth?: number;
 }
 interface Request { controller: AbortController; promise: Promise<TranslationCacheData | null> }
 
@@ -81,7 +85,6 @@ export class DualSubtitleService {
         this.views.set(caption, view);
       }
       if (view.text !== text) this.updateText(view, text);
-      this.applyStyle(view);
     }
     for (const [caption, view] of this.views) {
       if (!live.has(caption)) {
@@ -145,9 +148,11 @@ export class DualSubtitleService {
     overlay.className = "ht-dual-subtitle";
     overlay.lang = "ru";
     overlay.setAttribute("aria-live", "polite");
+    const content = document.createElement("span");
+    content.className = "ht-dual-subtitle-content";
     player.appendChild(overlay);
     const view: CaptionView = {
-      window: caption, player, overlay, text: "", translation: "", translationSource: "",
+      window: caption, player, overlay, content, text: "", translation: "", translationSource: "",
       revision: 0, generation: 0, appliedRevision: 0,
       lastRequestedText: "", lastRequestedRevision: 0, lastRequestAt: null,
     };
@@ -193,6 +198,7 @@ export class DualSubtitleService {
   private clearTranslation(view: CaptionView): void {
     view.translation = "";
     view.translationSource = "";
+    view.content.textContent = "";
     view.overlay.textContent = "";
     view.overlay.removeAttribute("data-alignment");
     view.overlay.removeAttribute("data-status");
@@ -296,7 +302,8 @@ export class DualSubtitleService {
   }
 
   private showError(view: CaptionView): void {
-    view.overlay.textContent = chrome.i18n.getMessage("dualSubtitleError") || "Subtitle translation unavailable";
+    view.content.textContent = chrome.i18n.getMessage("dualSubtitleError") || "Subtitle translation unavailable";
+    if (view.content.parentElement !== view.overlay) view.overlay.appendChild(view.content);
     view.overlay.setAttribute("data-status", "error");
     this.positionAll();
   }
@@ -309,38 +316,98 @@ export class DualSubtitleService {
       : { kind: "none" as const, ranges: [] };
     view.overlay.removeAttribute("data-status");
     view.overlay.setAttribute("data-alignment", alignment.kind);
-    view.overlay.textContent = "";
+    view.content.textContent = "";
     let offset = 0;
     for (const range of alignment.ranges) {
-      view.overlay.append(document.createTextNode(view.translation.slice(offset, range.start)));
+      view.content.append(document.createTextNode(view.translation.slice(offset, range.start)));
       const mark = document.createElement("mark");
       mark.textContent = view.translation.slice(range.start, range.end);
-      view.overlay.appendChild(mark);
+      view.content.appendChild(mark);
       offset = range.end;
     }
-    view.overlay.append(document.createTextNode(view.translation.slice(offset)));
+    view.content.append(document.createTextNode(view.translation.slice(offset)));
+    if (view.content.parentElement !== view.overlay) view.overlay.appendChild(view.content);
   }
 
   private applyStyle(view: CaptionView): void {
+    const segment = findVisibleCaptionSegment(view.window);
+    const native = segment ? window.getComputedStyle(segment) : undefined;
     view.overlay.dataset.position = this.settings.position;
-    view.overlay.style.fontSize = `${this.settings.fontSize}px`;
+    // Follow YouTube's actual rendered font, including its size changes in
+    // fullscreen and the viewer's own caption-style settings. The old custom
+    // size is retained if the viewer explicitly turns matching off.
+    const nativeSize = native?.fontSize;
+    view.overlay.style.fontSize = this.settings.matchYouTubeFontSize && nativeSize && parseFloat(nativeSize) > 0
+      ? nativeSize : `${this.settings.fontSize}px`;
+    view.overlay.style.fontFamily = native?.fontFamily || "";
+    view.overlay.style.fontWeight = native?.fontWeight || "";
+    view.overlay.style.fontStyle = native?.fontStyle || "";
+    view.overlay.style.letterSpacing = native?.letterSpacing || "";
+    view.overlay.style.lineHeight = native?.lineHeight || "";
     view.overlay.style.color = `rgba(255, 255, 255, ${this.settings.textOpacity / 100})`;
-    view.overlay.style.backgroundColor = `rgba(8, 8, 8, ${this.settings.backgroundOpacity / 100})`;
+    view.content.style.backgroundColor = `rgba(8, 8, 8, ${this.settings.backgroundOpacity / 100})`;
+  }
+
+  /** YouTube's stable CSS anchor, not its content-sized box's moving edge. */
+  private horizontalAnchor(view: CaptionView, player: DOMRect): { x: number; leftAligned: boolean } {
+    const style = window.getComputedStyle(view.window);
+    const marginLeft = parseFloat(style.marginLeft) || 0;
+    const leftAlignedText = style.textAlign === "left" || style.textAlign === "start";
+    const parent = view.window.offsetParent ?? view.window.parentElement;
+    const origin = parent?.getBoundingClientRect();
+    const left = parseFloat(style.left);
+    const caption = view.window.getBoundingClientRect();
+    if (origin && Number.isFinite(left)) {
+      const offset = style.left.endsWith("%") ? origin.width * left / 100 : left;
+      const x = origin.left - player.left + offset;
+      // A left-aligned window can still be centered with a changing negative
+      // margin. In that case its CSS anchor, not its moving box edge, is the
+      // stable point. Otherwise use the actual edge (including any margin).
+      const centeredOnAnchor = caption.width > 0
+        ? Math.abs(caption.left - player.left + caption.width / 2 - x) < 1
+        : marginLeft < 0;
+      if (leftAlignedText && !centeredOnAnchor) {
+        view.unmarginedCenterWidth = undefined;
+        return { x: caption.left - player.left, leftAligned: true };
+      }
+      // YouTube can drag a centered window by setting left to the window's
+      // *left edge* and removing its centering margin. Keep the center it had
+      // at the start of the drag, rather than snapping half a line sideways;
+      // the captured width must not grow when new caption words arrive.
+      if (style.textAlign === "center" && caption.width > 0 &&
+          Math.abs(caption.left - player.left - x) < 1) {
+        view.unmarginedCenterWidth ??= caption.width;
+        return { x: x + view.unmarginedCenterWidth / 2, leftAligned: false };
+      }
+      view.unmarginedCenterWidth = undefined;
+      return { x, leftAligned: false };
+    }
+    view.unmarginedCenterWidth = undefined;
+    return { x: caption.left - player.left + (leftAlignedText ? 0 : caption.width / 2), leftAligned: leftAlignedText };
   }
 
   private positionAll = (): void => {
     const topOffsets = new Map<HTMLElement, number>();
     for (const view of this.views.values()) {
+      this.applyStyle(view);
       const player = view.player.getBoundingClientRect();
       view.overlay.style.maxWidth = `${Math.max(0, player.width * 0.9)}px`;
+      // The frame's width depends on the font/player, never on the translation
+      // length. Left-aligned text therefore keeps its place as new words arrive.
+      const box = view.overlay.getBoundingClientRect();
+      const margin = player.width * 0.05;
+      const anchor = this.settings.position === "top"
+        ? { x: player.width / 2, leftAligned: false }
+        : this.horizontalAnchor(view, player);
+      const desiredLeft = anchor.x - (anchor.leftAligned ? 0 : box.width / 2);
+      const maxLeft = Math.max(margin, player.width - margin - box.width);
+      view.overlay.style.left = `${Math.max(margin, Math.min(maxLeft, desiredLeft))}px`;
       if (this.settings.position === "top") {
         const top = topOffsets.get(view.player) ?? TOP_INSET_PX + this.settings.verticalGap;
-        view.overlay.style.left = `${player.width / 2}px`;
         view.overlay.style.top = `${top}px`;
-        if (view.overlay.textContent) topOffsets.set(view.player, top + view.overlay.getBoundingClientRect().height + TOP_STACK_GAP_PX);
+        if (view.overlay.textContent) topOffsets.set(view.player, top + box.height + TOP_STACK_GAP_PX);
       } else {
         const caption = view.window.getBoundingClientRect();
-        view.overlay.style.left = `${caption.left + caption.width / 2 - player.left}px`;
         view.overlay.style.top = `${caption.top - player.top - this.settings.verticalGap}px`;
       }
     }

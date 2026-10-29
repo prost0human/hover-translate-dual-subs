@@ -108,7 +108,7 @@ describe("dual captions on the saved player DOM", () => {
   });
   it("reacts to live settings, hidden captions and Russian tracks without requests", async () => {
     await waitForDebounce();
-    const firstChange = chrome.storage.sync.set({ [DUAL_SETTINGS_KEY]: { enabled: true, crossHighlight: false, fontSize: 30 } });
+    const firstChange = chrome.storage.sync.set({ [DUAL_SETTINGS_KEY]: { enabled: true, crossHighlight: false, matchYouTubeFontSize: false, fontSize: 30 } });
     await vi.advanceTimersByTimeAsync(0); await firstChange;
     dual.setSelection(caption, "back down", "отступить");
     expect(overlay()?.querySelector("mark")).toBeNull();
@@ -249,8 +249,68 @@ describe("dual captions on the saved player DOM", () => {
     expect(overlay()?.textContent).toBe("русский A line grows longer");
   });
 
+  it("matches YouTube's computed font on changes and preserves the optional custom size", async () => {
+    segment.style.fontSize = "18px";
+    segment.style.fontFamily = "Verdana";
+    segment.style.fontWeight = "700";
+    segment.style.lineHeight = "24px";
+    dual.sync();
+    await waitForDebounce();
+    expect(overlay()?.style.fontSize).toBe("18px");
+    expect(overlay()?.style.fontFamily).toBe("Verdana");
+    expect(overlay()?.style.fontWeight).toBe("700");
+    expect(overlay()?.style.lineHeight).toBe("24px");
+
+    segment.style.fontSize = "32px";
+    window.dispatchEvent(new Event("resize"));
+    expect(overlay()?.style.fontSize).toBe("32px");
+    segment.style.fontSize = "38px";
+    document.dispatchEvent(new Event("fullscreenchange"));
+    expect(overlay()?.style.fontSize).toBe("38px");
+
+    const custom = chrome.storage.sync.set({ [DUAL_SETTINGS_KEY]: { enabled: true, matchYouTubeFontSize: false, fontSize: 30 } });
+    await flush(); await custom;
+    expect(overlay()?.style.fontSize).toBe("30px");
+    segment.style.fontSize = "40px"; dual.sync();
+    expect(overlay()?.style.fontSize).toBe("30px");
+    const automatic = chrome.storage.sync.set({ [DUAL_SETTINGS_KEY]: { enabled: true, matchYouTubeFontSize: true, fontSize: 30 } });
+    await flush(); await automatic;
+    expect(overlay()?.style.fontSize).toBe("40px");
+  });
+
+  it("anchors a left-aligned YouTube caption to its stable CSS position as its box grows", async () => {
+    segment.style.fontSize = "22px";
+    caption.style.left = "120px";
+    caption.style.textAlign = "left";
+    const player = caption.closest<HTMLElement>(".html5-video-player")!;
+    vi.spyOn(player, "getBoundingClientRect").mockReturnValue({ left: 100, top: 50, width: 600 } as DOMRect);
+    vi.spyOn(container, "getBoundingClientRect").mockReturnValue({ left: 100, top: 50, width: 600 } as DOMRect);
+    const box = vi.spyOn(caption, "getBoundingClientRect").mockReturnValue({ left: 220, top: 350, width: 80 } as DOMRect);
+    await waitForDebounce();
+    vi.spyOn(overlay()!, "getBoundingClientRect").mockReturnValue({ width: 240, height: 26 } as DOMRect);
+    dual.sync();
+    expect(overlay()?.style.left).toBe("120px");
+    box.mockReturnValue({ left: 220, top: 350, width: 220 } as DOMRect);
+    changeText("I didn't expect him to back down. today");
+    expect(overlay()?.style.left).toBe("120px");
+    caption.style.left = "210px";
+    box.mockReturnValue({ left: 310, top: 350, width: 220 } as DOMRect);
+    dual.sync();
+    expect(overlay()?.style.left).toBe("210px");
+    caption.style.marginLeft = "10px";
+    box.mockReturnValue({ left: 320, top: 350, width: 220 } as DOMRect);
+    dual.sync();
+    expect(overlay()?.style.left).toBe("220px");
+    caption.style.marginLeft = "-10px";
+    box.mockReturnValue({ left: 300, top: 350, width: 220 } as DOMRect);
+    dual.sync();
+    expect(overlay()?.style.left).toBe("200px");
+  });
+
   it("defaults old or malformed position settings to above and moves/stacks overlays at the top of each player", async () => {
     expect(normalizeDualSettings({ enabled: true }).position).toBe("above");
+    expect(normalizeDualSettings({ fontSize: 30 }).matchYouTubeFontSize).toBe(true);
+    expect(normalizeDualSettings({ matchYouTubeFontSize: false, fontSize: 30 }).fontSize).toBe(30);
     expect(normalizeDualSettings({ position: "invalid" as "top" }).position).toBe("above");
     await waitForDebounce();
     const player = caption.closest<HTMLElement>(".html5-video-player")!;
